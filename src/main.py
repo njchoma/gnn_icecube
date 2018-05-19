@@ -12,7 +12,23 @@ def train_one_epoch(net, criterion, optimizer, args, train_X, train_y, train_w):
   '''
   Train network for one epoch over the training set
   '''
-  return 0
+  nb_train = len(train_X)
+  batches = utils.get_batches(nb_train, args.batch_size)
+  nb_batches = len(batches)
+  epoch_loss = 0
+  for i, batch in enumerate(batches):
+    batch_X, batch_y, batch_w = utils.batch_sample(
+                                              train_X[batch],
+                                              train_y[batch],
+                                              train_w[batch]
+                                              )
+    epoch_loss += 1.0 
+    # Print running loss 10 times during each epoch
+    if (((i+1) % nb_batches//10) == 0):
+      nb_proc = (i+1)*args.batch_size
+      logging.info("  {:5d}: {:f}".format(nb_proc, epoch_loss/nb_proc))
+    
+  return epoch_loss / (nb_batches * args.batch_size)
 
 
 def train(
@@ -84,6 +100,8 @@ def main():
     assert (args.val_file   != None)
     train_X,train_y,train_w,_,_=utils.load_dataset(args.train_file,args.nb_train)
     val_X,  val_y,  val_w, _,_ =utils.load_dataset(args.val_file,  args.nb_val)
+    logging.info("Training on {} samples.".format(len(train_X)))
+    logging.info("Validate on {} samples.".format(len(val_X)))
     train(
           net,
           criterion,

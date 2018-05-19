@@ -3,6 +3,7 @@ import csv
 import argparse
 import logging
 import pickle
+import numpy as np
 
 import torch
 
@@ -14,6 +15,7 @@ import model
 ARGS_NAME  = 'args.pkl'
 MODEL_NAME = 'model.pkl'
 BEST_MODEL = 'best_model.pkl'
+NB_ZERO_NODES = 30 # Drastically improves performance
 
 #####################################
 #     EXPERIMENT INITIALIZATION     #
@@ -38,6 +40,7 @@ def read_args():
   add_arg('--nb_epoch', help='Number of epochs to train', type=int, default=4)
   add_arg('--lrate', help='Initial learning rate', default = 0.005)
   add_arg('--lrate_decay', help='Exponential decay factor', default=0.96)
+  add_arg('--batch_size', help='Size of each minibatch', default=4)
 
   # Dataset
   add_arg('--train_file', help='Path to train pickle file',type=str,default=None)
@@ -101,20 +104,73 @@ def initialize_experiment(experiment_dir):
 def load_dataset(datafile, nb_ex):
   with open(datafile, 'rb') as filein:
     X, y, weights, event_id, filenames = pickle.load(filein)
-  w = [] # Need to convert weights to float
-  for weight in weights[:nb_ex]:
-    w.append(float(weight))
-  return X[:nb_ex], y[:nb_ex], w, event_id[:nb_ex], filenames[:nb_ex]
+  return X[:nb_ex], y[:nb_ex], weights[:nb_ex],event_id[:nb_ex],filenames[:nb_ex]
 
 ####################
 #     BATCHING     #
 ####################
 
 def get_batches(nb_samples, batch_size):
-  pass
+  # Create batch indices
+  samples = np.arange(nb_samples)
+  # Shuffle batch indices
+  samples = np.random.permutation(samples)
+  # Ensure all minibatches are same size
+  samples = samples[:-(nb_samples % batch_size)]
+  # Reshape to shape (nb_batches, batch_size)
+  batches = samples.reshape(-1, batch_size)
+  return batches
 
-def pad_batch(samples):
-  pass
+def batch_sample(batch_X, batch_y, batch_w):
+  '''
+  Pad X to uniform size, then
+  wrap batch in torch Tensors (cuda if available)
+  '''
+  padded_X, adj_mask, batch_nb_nodes, = pad_batch(batch_X)
+  if torch.cuda.is_available():
+    wrap = torch.FloatTensor
+  else:
+    wrap = torch.FloatTensor
+  
+  X = wrap(padded_X)
+  y = wrap(batch_y)
+  w = wrap(batch_w)
+  adj_mask = wrap(adj_mask)
+  batch_nb_nodes = wrap(batch_nb_nodes)
+  return X, y, w, adj_mask, batch_nb_nodes
+
+def pad_batch(X):
+  '''
+  Minibatches must be uniform size in order to be passed through the GNN.
+  First a uniform zero-padding is applied to all samples.
+  This is for performance only (an oddity, to be resolved).
+  Next all samples are padded variably to bring the every sample up to a 
+  uniform size.
+  A mask for the adj matrix is returned,
+  and the true (plus uniform padding) sizes of each sample are also returned.
+  '''
+  nb_samples = len(X)
+  nb_features = X[0].shape[1]
+  largest_size = 0
+  batch_nb_nodes = np.zeros(nb_samples, dtype=int)
+  # First add zero nodes to samples and find largest sample
+  # Largest is the sample with the most points in point cloud
+  for i in range(nb_samples):
+    zeros = np.zeros((NB_ZERO_NODES, nb_features))
+    X[i] = np.concatenate((zeros, X[i]),axis=0)
+    batch_nb_nodes[i] = X[i].shape[0]
+    largest_size = max(largest_size, X[i].shape[0])
+
+  adj_mask = np.zeros(shape=(nb_samples, largest_size, largest_size))
+  # Append zero nodes to features with fewer points in point cloud
+  #   than largest_size
+  for i in range(nb_samples):
+    zeros = np.zeros((largest_size-X[i].shape[0], nb_features))
+    X[i] = np.concatenate((X[i], zeros), axis=0)
+    adj_mask[i, :batch_nb_nodes[i], :batch_nb_nodes[i]] = 1
+
+  X = np.stack(X, axis=0)
+  return X, adj_mask, batch_nb_nodes
 
 ###########################
 #     MODEL UTILITIES     #
