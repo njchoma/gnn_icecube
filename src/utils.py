@@ -13,6 +13,7 @@ import model
 #####################
 ARGS_NAME  = 'args.pkl'
 MODEL_NAME = 'model.pkl'
+BEST_MODEL = 'best_model.pkl'
 
 #####################################
 #     EXPERIMENT INITIALIZATION     #
@@ -29,17 +30,27 @@ def read_args():
 
   # Experiment
   add_arg('--name', help='Experiment reference name', required=True)
+  add_arg('--evaluate', help='Perform evaluation on test set only',action='store_true')
+  add_arg('--save_best', help='Save best model', action='store_true')
+  add_arg('--save_every_epoch', help='Save model after every epoch. Good if training expected to be interrupted', action='store_true')
+
+  # Training
+  add_arg('--nb_epoch', help='Number of epochs to train', type=int, default=4)
+  add_arg('--lrate', help='Initial learning rate', default = 0.005)
+  add_arg('--lrate_decay', help='Exponential decay factor', default=0.96)
+
+  # Dataset
   add_arg('--train_file', help='Path to train pickle file',type=str,default=None)
   add_arg('--val_file',   help='Path to val   pickle file',type=str,default=None)
   add_arg('--test_file',  help='Path to test  pickle file',type=str,default=None)
   add_arg('--nb_train', help='Number of training samples', type=int, default=10)
   add_arg('--nb_val', help='Number of validation samples', type=int, default=10)
   add_arg('--nb_test', help='Number of test samples', type=int, default=10)
-  add_arg('--evaluate', help='Perform evaluation on test set only',action='store_true')
 
-  # Model
+  # Model Architecture
   add_arg('--nb_hidden', help='Number of hidden units per layer', default=32)
   add_arg('--nb_layer', help='Number of network grapn conv layers', default=6)
+
 
   return parser.parse_args()
 
@@ -84,9 +95,9 @@ def initialize_experiment(experiment_dir):
     writer.writerow(['Epoch', 'lrate', 'running_loss'])
 
 
-##########################
-#     DATA UTILITIES     #
-##########################
+#############################
+#     DATASET UTILITIES     #
+#############################
 def load_dataset(datafile, nb_ex):
   with open(datafile, 'rb') as filein:
     X, y, weights, event_id, filenames = pickle.load(filein)
@@ -94,6 +105,16 @@ def load_dataset(datafile, nb_ex):
   for weight in weights[:nb_ex]:
     w.append(float(weight))
   return X[:nb_ex], y[:nb_ex], w, event_id[:nb_ex], filenames[:nb_ex]
+
+####################
+#     BATCHING     #
+####################
+
+def get_batches(nb_samples, batch_size):
+  pass
+
+def pad_batch(samples):
+  pass
 
 ###########################
 #     MODEL UTILITIES     #
@@ -127,8 +148,22 @@ def load_model(model_file):
 
 def save_model(m, model_file):
   torch.save(m, model_file)
+  logging.warning("Model saved.")
+
+def save_best_model(experiment_dir, net):
+  model_path = os.path.join(experiment_dir, BEST_MODEL)
+  save_model(net, model_path)
+
+def save_epoch_model(experiment_dir, net):
+  model_path = os.path.join(experiment_dir, MODEL_NAME)
+  save_model(net, model_path)
+
 
 def load_args(experiment_dir):
+  '''
+  Restore experiment arguments
+  args contain e.g. nb_epochs_complete, lrate
+  '''
   args_path = os.path.join(experiment_dir, ARGS_NAME)
   with open(args_path, 'rb') as argfile:
     args = pickle.load(argfile)
@@ -136,7 +171,15 @@ def load_args(experiment_dir):
   return args
 
 def save_args(experiment_dir, args):
+  '''
+  Save experiment arguments.
+  args contain e.g. nb_epochs_complete, lrate
+  '''
   args_path = os.path.join(experiment_dir, ARGS_NAME)
   with open(args_path, 'wb') as argfile:
     pickle.dump(args, argfile)
   logging.warning("Experiment arguments saved")
+
+######################
+#     EVALUATION     #
+######################
