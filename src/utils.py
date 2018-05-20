@@ -5,6 +5,11 @@ import logging
 import pickle
 import numpy as np
 
+from sklearn.metrics import roc_auc_score, roc_curve
+
+import matplotlib; matplotlib.use('Agg') # no display on clusters
+import matplotlib.pyplot as plt
+
 import torch
 from torch.autograd import Variable
 
@@ -16,7 +21,9 @@ import model
 ARGS_NAME  = 'args.pkl'
 MODEL_NAME = 'model.pkl'
 BEST_MODEL = 'best_model.pkl'
+STATS_CSV  = 'training_stats.csv'
 NB_ZERO_NODES = 30 # Drastically improves performance
+PLOT_ZOOMS=[10**-k for k in [0,2,4,5]]
 
 #####################################
 #     EXPERIMENT INITIALIZATION     #
@@ -33,6 +40,7 @@ def read_args():
 
   # Experiment
   add_arg('--name', help='Experiment reference name', required=True)
+  add_arg('--eval_tpr',help='TPR at which FPR will be evaluated', default=0.2)
   add_arg('--evaluate', help='Perform evaluation on test set only',action='store_true')
   add_arg('--save_best', help='Save best model', action='store_true')
   add_arg('--save_every_epoch', help='Save model after every epoch. Good if training expected to be interrupted', action='store_true')
@@ -93,10 +101,10 @@ def initialize_experiment(experiment_dir):
   '''
   print("Initializing experiment.")
   os.mkdir(experiment_dir)
-  csv_path = os.path.join(experiment_dir, 'training_stats.csv')
+  csv_path = os.path.join(experiment_dir, STATS_CSV)
   with open(csv_path, 'w') as csvfile:
     writer = csv.writer(csvfile)
-    writer.writerow(['Epoch', 'lrate', 'running_loss'])
+    writer.writerow(['Epoch', 'lrate', 'train_fpr', 'train_roc', 'train_loss', 'val_fpr', 'val_roc', 'val_loss', 'running_loss'])
 
 
 #############################
@@ -245,3 +253,58 @@ def save_args(experiment_dir, args):
 ######################
 #     EVALUATION     #
 ######################
+def score_plot_preds(true_y, pred_y, weights, experiment_dir, plot_name, t=0.5):
+  '''
+  Compute and return weighted ROC AUC scores, FPR at given t (TPR).
+  Plot ROC AUC curves and save plots.
+  '''
+  roc_score = roc_auc_score(true_y, pred_y, sample_weight=weights)
+  fprs, tprs, thresholds = roc_curve(true_y, pred_y, sample_weight=weights)
+  # Compute FPR at specified t
+  fpr = 1.0
+  for i, tpr in enumerate(tprs):
+    if tpr > t:
+      fpr = fprs[i]
+      break
+
+  # Plot ROC AUC curves
+  for i, zoom in enumerate(PLOT_ZOOMS):
+    plot_roc_curve(fprs, tprs, zoom, experiment_dir, plot_name, [fpr, t])
+
+  return fpr, roc_score
+
+def plot_roc_curve(fprs, tprs, zoom, experiment_dir, plot_name, performance):
+  '''
+  Plots and saves one ROC curve at specified zoom level.
+  '''
+  # Plot
+  plt.clf()
+  plt.plot(fprs, tprs)
+  # Zooms
+  plt.xlim([0,zoom])
+  plt.ylim([0,zoom])
+  # Style
+  plt.xlabel("False Positive Rate (1- BG rejection)")
+  plt.ylabel("True Positive Rate (Signal Efficiency)")
+  plt.grid(linestyle=':')
+  #Save
+  plotfile = os.path.join(experiment_dir, '{}_{}.png'.format(plot_name, zoom))
+  plt.savefig(plotfile)
+  plt.clf()
+
+def update_best_plots(experiment_dir):
+  '''
+  Rename .png plots to best
+  '''
+  for f in os.listdir(experiment_dir):
+    # Write over old best curves
+    if f.endswith(".png") and not f.startswith("best"):
+      old_name = os.path.join(experiment_dir, f)
+      new_name = os.path.join(experiment_dir, "best_"+f)
+      os.rename(old_name, new_name)
+      
+def track_epoch_stats(epoch, lrate, train_loss, train_stats, val_stats, experiment_dir):
+  csv_path = os.path.join(experiment_dir, STATS_CSV)
+  with open(csv_path, 'a') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow((epoch, lrate)+train_stats+val_stats+(train_loss,))
