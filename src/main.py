@@ -17,14 +17,18 @@ def train_one_epoch(net, criterion, optimizer, args, train_X, train_y, train_w):
   nb_batches = len(batches)
   epoch_loss = 0
   for i, batch in enumerate(batches):
-    batch_X, batch_y, batch_w = utils.batch_sample(
+    optimizer.zero_grad()
+    X, y, w, adj_mask, batch_nb_nodes = utils.batch_sample(
                                               train_X[batch],
                                               train_y[batch],
                                               train_w[batch]
                                               )
-    epoch_loss += 1.0 
-    # Print running loss 10 times during each epoch
-    if (((i+1) % nb_batches//10) == 0):
+    out = net(X, adj_mask, batch_nb_nodes)
+    loss = criterion(out, y, w)
+    optimizer.step()
+    epoch_loss += loss.data[0] 
+    # Print running loss about 10 times during each epoch
+    if (((i+1) % (nb_batches//10)) == 0):
       nb_proc = (i+1)*args.batch_size
       logging.info("  {:5d}: {:f}".format(nb_proc, epoch_loss/nb_proc))
     
@@ -44,6 +48,7 @@ def train(
   Optionally save model after every epoch.
   Optionally track best model.
   '''
+  # Nb epochs completed tracked in case training interrupted
   for i in range(args.nb_epochs_complete, args.nb_epoch):
     # Update learning rate in optimizer
     optimizer = torch.optim.Adamax(net.parameters(), lr=args.lrate)
@@ -67,6 +72,7 @@ def train(
 
 def main():
   input_dim=6
+  spat_dims=[0,1,2]
   args = utils.read_args()
 
   # Get path to experiment directory
@@ -89,11 +95,12 @@ def main():
   # Restore model if continuing previous training or evaluating
   net = utils.create_or_restore_model(
                                     experiment_dir, 
-                                    input_dim,
                                     args.nb_hidden, 
-                                    args.nb_layer
+                                    args.nb_layer,
+                                    input_dim,
+                                    spat_dims
                                     )
-  criterion = nn.BCELoss()
+  criterion = nn.functional.binary_cross_entropy
   if not args.evaluate:
     # Before loading, ensure train, val file arguments not None
     assert (args.train_file != None)

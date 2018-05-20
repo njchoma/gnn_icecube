@@ -6,6 +6,7 @@ import pickle
 import numpy as np
 
 import torch
+from torch.autograd import Variable
 
 import model
 
@@ -37,10 +38,10 @@ def read_args():
   add_arg('--save_every_epoch', help='Save model after every epoch. Good if training expected to be interrupted', action='store_true')
 
   # Training
-  add_arg('--nb_epoch', help='Number of epochs to train', type=int, default=4)
-  add_arg('--lrate', help='Initial learning rate', default = 0.005)
-  add_arg('--lrate_decay', help='Exponential decay factor', default=0.96)
-  add_arg('--batch_size', help='Size of each minibatch', default=4)
+  add_arg('--nb_epoch', help='Number of epochs to train', type=int, default=2)
+  add_arg('--lrate', help='Initial learning rate', type=float, default = 0.005)
+  add_arg('--lrate_decay',help='Exponential decay factor',type=float,default=0.96)
+  add_arg('--batch_size', help='Size of each minibatch', type=int, default=4)
 
   # Dataset
   add_arg('--train_file', help='Path to train pickle file',type=str,default=None)
@@ -111,12 +112,16 @@ def load_dataset(datafile, nb_ex):
 ####################
 
 def get_batches(nb_samples, batch_size):
+  '''
+  Randomly permute sample indices, then divide into minibatches.
+  '''
   # Create batch indices
   samples = np.arange(nb_samples)
   # Shuffle batch indices
   samples = np.random.permutation(samples)
   # Ensure all minibatches are same size
-  samples = samples[:-(nb_samples % batch_size)]
+  if (nb_samples % batch_size) != 0:
+    samples = samples[:-(nb_samples % batch_size)]
   # Reshape to shape (nb_batches, batch_size)
   batches = samples.reshape(-1, batch_size)
   return batches
@@ -132,11 +137,11 @@ def batch_sample(batch_X, batch_y, batch_w):
   else:
     wrap = torch.FloatTensor
   
-  X = wrap(padded_X)
-  y = wrap(batch_y)
-  w = wrap(batch_w)
-  adj_mask = wrap(adj_mask)
-  batch_nb_nodes = wrap(batch_nb_nodes)
+  X = Variable(wrap(padded_X))
+  y = Variable(wrap(batch_y))
+  w = Variable(wrap(batch_w))
+  adj_mask = Variable(wrap(adj_mask))
+  batch_nb_nodes = Variable(wrap(batch_nb_nodes))
   return X, y, w, adj_mask, batch_nb_nodes
 
 def pad_batch(X):
@@ -177,9 +182,10 @@ def pad_batch(X):
 ###########################
 def create_or_restore_model(
                             experiment_dir,
-                            input_dim,
                             nb_hidden,
-                            nb_layer
+                            nb_layer,
+                            input_dim,
+                            spat_dims
                             ):
   '''
   Checks if model exists and creates it if not.
@@ -192,7 +198,7 @@ def create_or_restore_model(
     logging.warning("Model restored.")
   else:
     logging.warning("Creating new model:")
-    m = model.GNN(input_dim, nb_hidden, nb_layer)
+    m = model.GNN(nb_hidden, nb_layer, input_dim, spat_dims)
     logging.info(m)
     save_model(m, model_file)
     logging.warning("Initial model saved.")
