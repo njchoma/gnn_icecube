@@ -218,15 +218,16 @@ def load_model(model_file):
 
 def save_model(m, model_file):
   torch.save(m, model_file)
-  logging.warning("Model saved.")
 
 def save_best_model(experiment_dir, net):
   model_path = os.path.join(experiment_dir, BEST_MODEL)
   save_model(net, model_path)
+  logging.warning("Best model saved.")
 
 def save_epoch_model(experiment_dir, net):
   model_path = os.path.join(experiment_dir, MODEL_NAME)
   save_model(net, model_path)
+  logging.warning("Current model saved.")
 
 
 def load_args(experiment_dir):
@@ -269,7 +270,8 @@ def score_plot_preds(true_y, pred_y, weights, experiment_dir, plot_name, t=0.5):
 
   # Plot ROC AUC curves
   for i, zoom in enumerate(PLOT_ZOOMS):
-    plot_roc_curve(fprs, tprs, zoom, experiment_dir, plot_name, [fpr, t])
+    fig_name = plot_name+'_{}_{}'.format(i, zoom)
+    plot_roc_curve(fprs, tprs, zoom, experiment_dir, fig_name, [fpr, t])
 
   return fpr, roc_score
 
@@ -288,7 +290,7 @@ def plot_roc_curve(fprs, tprs, zoom, experiment_dir, plot_name, performance):
   plt.ylabel("True Positive Rate (Signal Efficiency)")
   plt.grid(linestyle=':')
   #Save
-  plotfile = os.path.join(experiment_dir, '{}_{}.png'.format(plot_name, zoom))
+  plotfile = os.path.join(experiment_dir, '{}.png'.format(plot_name))
   plt.savefig(plotfile)
   plt.clf()
 

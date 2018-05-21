@@ -29,6 +29,7 @@ def train_one_epoch(net, criterion, optimizer, args, train_X, train_y, train_w):
                                               )
     out = net(X, adj_mask, batch_nb_nodes)
     loss = criterion(out, y, w)
+    loss.backward()
     optimizer.step()
     epoch_loss += loss.data[0] 
     # Print running loss about 10 times during each epoch
@@ -79,6 +80,7 @@ def train(
     args.nb_epochs_complete += 1
     # Track best model performance
     if (val_stats[0] < args.best_fpr):
+      logging.warning("Best performance on valid set.")
       args.best_fpr = val_stats[0]
       utils.update_best_plots(experiment_dir)
       # Save best model
@@ -93,7 +95,7 @@ def train(
   logging.warning("Training completed.")
 
 
-def evaluate(net, criterion, experiment_dir, args, in_X, in_y, in_w, plot_name=None):
+def evaluate(net, criterion, experiment_dir, args, in_X, in_y, in_w, plot_name):
   '''
   Evaluate network over the given set of samples
   '''
@@ -137,7 +139,7 @@ def evaluate(net, criterion, experiment_dir, args, in_X, in_y, in_w, plot_name=N
   fpr, roc = utils.score_plot_preds(true_y, pred_y, weights,
                                       experiment_dir, plot_name, args.eval_tpr)
   logging.info("{}: loss {:>.3E} -- AUC {:>.3E} -- FPR {:>.3e}".format(
-                                            plot_name, epoch_loss, roc, fpr))
+                                      plot_name, epoch_loss, roc, fpr))
   return (fpr, roc, epoch_loss)
 
 
