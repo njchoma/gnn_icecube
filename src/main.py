@@ -35,7 +35,7 @@ def train_one_epoch(net, criterion, optimizer, args, train_X, train_y, train_w):
     # Print running loss about 10 times during each epoch
     if (((i+1) % (nb_batches//10)) == 0):
       nb_proc = (i+1)*args.batch_size
-      logging.info("  {:5d}: {:.7f}".format(nb_proc, epoch_loss/nb_proc))
+      logging.info("  {:5d}: {:.9f}".format(nb_proc, epoch_loss/nb_proc))
     
   return epoch_loss / (nb_batches * args.batch_size)
 
@@ -126,13 +126,13 @@ def evaluate(net, criterion, experiment_dir, args, in_X, in_y, in_w, plot_name):
     # Track predictions, truth, weights over batches
     beg =     i * args.batch_size
     end = (i+1) * args.batch_size
-    pred_y[beg:end] = out.data.numpy()
+    pred_y[beg:end] = out.data.cpu().numpy()
     true_y[beg:end] = in_y[batch]
     weights[beg:end] = in_w[batch]
     # Print running loss 2 times 
     if (((i+1) % (nb_batches//2)) == 0):
       nb_proc = (i+1)*args.batch_size
-      logging.info("  {:5d}: {:.7f}".format(nb_proc, epoch_loss/nb_proc))
+      logging.info("  {:5d}: {:.9f}".format(nb_proc, epoch_loss/nb_proc))
     
   # Score predictions, save plots, and log performance
   epoch_loss /= nb_eval # Normalize loss
@@ -174,6 +174,9 @@ def main():
                                     input_dim,
                                     spatial_dims
                                     )
+  if torch.cuda.is_available():
+    net = net.cuda()
+    logging.warning("Training on GPU")
   criterion = nn.functional.binary_cross_entropy
   if not args.evaluate:
     # Before loading, ensure train, val file arguments not None

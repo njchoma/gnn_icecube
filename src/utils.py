@@ -144,7 +144,7 @@ def batch_sample(batch_X, batch_y, batch_w):
   '''
   padded_X, adj_mask, batch_nb_nodes, = pad_batch(batch_X)
   if torch.cuda.is_available():
-    wrap = torch.FloatTensor
+    wrap = torch.cuda.FloatTensor
   else:
     wrap = torch.FloatTensor
   
