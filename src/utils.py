@@ -223,6 +223,13 @@ def load_model(model_file):
   m = torch.load(model_file)
   return m
 
+def load_best_model(experiment_dir):
+  '''
+  Load the model which performed best in training.
+  '''
+  best_model_path = os.path.join(experiment_dir, BEST_MODEL)
+  return load_model(best_model_path)
+
 def save_model(m, model_file):
   '''
   Save torch model.

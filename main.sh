@@ -18,7 +18,7 @@ BATCH_SIZE=7
 NB_LAYER=6
 NB_HIDDEN=32
 
-OPTIONS="--save_every_epoch --evaluate"
+OPTIONS="--save_every_epoch"
 
 PYARGS="--name $NAME --train_file $TRAINFILE --val_file $VALFILE --test_file $TESTFILE $OPTIONS --nb_train $NB_TRAIN --nb_val $NB_VAL --nb_test $NB_TEST --batch_size $BATCH_SIZE --nb_epoch $NB_EPOCH --nb_layer $NB_LAYER --nb_hidden $NB_HIDDEN"
 
