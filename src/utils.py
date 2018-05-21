@@ -60,8 +60,8 @@ def read_args():
   add_arg('--nb_test', help='Number of test samples', type=int, default=10)
 
   # Model Architecture
-  add_arg('--nb_hidden', help='Number of hidden units per layer', default=32)
-  add_arg('--nb_layer', help='Number of network grapn conv layers', default=6)
+  add_arg('--nb_hidden', help='Number of hidden units per layer', type=int, default=32)
+  add_arg('--nb_layer', help='Number of network grapn conv layers', type=int, default=6)
 
 
   return parser.parse_args()
@@ -111,6 +111,9 @@ def initialize_experiment(experiment_dir):
 #     DATASET UTILITIES     #
 #############################
 def load_dataset(datafile, nb_ex):
+  '''
+  Load IceCube dataset from pickle file.
+  '''
   with open(datafile, 'rb') as filein:
     X, y, weights, event_id, filenames = pickle.load(filein)
   return X[:nb_ex], y[:nb_ex], weights[:nb_ex],event_id[:nb_ex],filenames[:nb_ex]
@@ -157,7 +160,7 @@ def pad_batch(X):
   Minibatches must be uniform size in order to be passed through the GNN.
   First a uniform zero-padding is applied to all samples.
   This is for performance only (an oddity, to be resolved).
-  Next all samples are padded variably to bring the every sample up to a 
+  Next all samples are padded variably to bring every sample up to a 
   uniform size.
   A mask for the adj matrix is returned,
   and the true (plus uniform padding) sizes of each sample are also returned.
@@ -176,12 +179,13 @@ def pad_batch(X):
 
   adj_mask = np.zeros(shape=(nb_samples, largest_size, largest_size))
   # Append zero nodes to features with fewer points in point cloud
-  #   than largest_size
+  #   than largest_size.
   for i in range(nb_samples):
     zeros = np.zeros((largest_size-X[i].shape[0], nb_features))
     X[i] = np.concatenate((X[i], zeros), axis=0)
     adj_mask[i, :batch_nb_nodes[i], :batch_nb_nodes[i]] = 1
 
+  # Put all samples into numpy array.
   X = np.stack(X, axis=0)
   return X, adj_mask, batch_nb_nodes
 
@@ -213,18 +217,30 @@ def create_or_restore_model(
   return m
 
 def load_model(model_file):
+  '''
+  Load torch model.
+  '''
   m = torch.load(model_file)
   return m
 
 def save_model(m, model_file):
+  '''
+  Save torch model.
+  '''
   torch.save(m, model_file)
 
 def save_best_model(experiment_dir, net):
+  '''
+  Called if current model performs best.
+  '''
   model_path = os.path.join(experiment_dir, BEST_MODEL)
   save_model(net, model_path)
   logging.warning("Best model saved.")
 
 def save_epoch_model(experiment_dir, net):
+  '''
+  Optionally called after each epoch to save current model.
+  '''
   model_path = os.path.join(experiment_dir, MODEL_NAME)
   save_model(net, model_path)
   logging.warning("Current model saved.")
@@ -257,7 +273,7 @@ def save_args(experiment_dir, args):
 def score_plot_preds(true_y, pred_y, weights, experiment_dir, plot_name, t=0.5):
   '''
   Compute and return weighted ROC AUC scores, FPR at given t (TPR).
-  Plot ROC AUC curves and save plots.
+  Plot ROC curves and save plots.
   '''
   roc_score = roc_auc_score(true_y, pred_y, sample_weight=weights)
   fprs, tprs, thresholds = roc_curve(true_y, pred_y, sample_weight=weights)
@@ -277,7 +293,7 @@ def score_plot_preds(true_y, pred_y, weights, experiment_dir, plot_name, t=0.5):
 
 def plot_roc_curve(fprs, tprs, zoom, experiment_dir, plot_name, performance):
   '''
-  Plots and saves one ROC curve at specified zoom level.
+  Plot and save one ROC curve at specified zoom level.
   '''
   # Plot
   plt.clf()
@@ -296,7 +312,7 @@ def plot_roc_curve(fprs, tprs, zoom, experiment_dir, plot_name, performance):
 
 def update_best_plots(experiment_dir):
   '''
-  Rename .png plots to best
+  Rename .png plots to best when called.
   '''
   for f in os.listdir(experiment_dir):
     # Write over old best curves
@@ -306,6 +322,9 @@ def update_best_plots(experiment_dir):
       os.rename(old_name, new_name)
       
 def track_epoch_stats(epoch, lrate, train_loss, train_stats, val_stats, experiment_dir):
+  '''
+  Write loss, fpr, roc_auc information to .csv file in model directory.
+  '''
   csv_path = os.path.join(experiment_dir, STATS_CSV)
   with open(csv_path, 'a') as csvfile:
     writer = csv.writer(csvfile)

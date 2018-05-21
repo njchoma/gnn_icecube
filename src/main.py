@@ -191,7 +191,16 @@ def main():
           train_X, train_y, train_w,
           val_X, val_y, val_w
           )
-    
+
+  # Perform evaluation over test set
+  try:
+    net = utils.load_best_model(experiment_dir)
+  except:
+    logging.warning("Could not load best model for test set. Using current.")
+  assert (args.test_file != None)
+  test_X, test_y, test_w, _, _= utils.load_dataset(args.test_file,args.nb_test)
+  test_stats = evaluate(net, criterion, experiment_dir, args,
+                            test_X, test_y, test_w, 'Test')
 
 if __name__ == "__main__":
   main()
