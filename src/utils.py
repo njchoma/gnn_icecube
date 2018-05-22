@@ -308,6 +308,7 @@ def plot_roc_curve(fprs, tprs, zoom, experiment_dir, plot_name, performance):
   plt.plot(fprs, tprs)
   # Zooms
   plt.xlim([0,zoom])
+  plt.ylim([0,1.0])
   # Style
   plt.xlabel("False Positive Rate (1- BG rejection)")
   plt.ylabel("True Positive Rate (Signal Efficiency)")
