@@ -11,6 +11,7 @@
 # SBATCH --mail-type=FAIL # notifications for job done & fail
 #SBATCH --mail-user=nc2201@courant.nyu.edu
 
+mkdir -p slurm_out
 
 # Dataset
 TRAINFILE='/home/nc2201/data/icecube/orig/train.pickle'
