@@ -37,4 +37,5 @@ PYARGS="--name $NAME --train_file $TRAINFILE --val_file $VALFILE --test_file $TE
 echo -e "\nStarting experiment with name $NAME...\n"
 
 module load python/3.6-anaconda-4.4
-python3 src/main.py $PYARGS
+source activate gnn
+python src/main.py $PYARGS
