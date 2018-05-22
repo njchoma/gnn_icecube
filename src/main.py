@@ -79,9 +79,9 @@ def train(
     args.lrate *= args.lrate_decay
     args.nb_epochs_complete += 1
     # Track best model performance
-    if (val_stats[0] < args.best_fpr):
+    if (val_stats[0] > args.best_tpr):
       logging.warning("Best performance on valid set.")
-      args.best_fpr = val_stats[0]
+      args.best_tpr = val_stats[0]
       utils.update_best_plots(experiment_dir)
       # Save best model
       if (args.save_best):
@@ -136,11 +136,11 @@ def evaluate(net, criterion, experiment_dir, args, in_X, in_y, in_w, plot_name):
     
   # Score predictions, save plots, and log performance
   epoch_loss /= nb_eval # Normalize loss
-  fpr, roc = utils.score_plot_preds(true_y, pred_y, weights,
+  tpr, roc = utils.score_plot_preds(true_y, pred_y, weights,
                                       experiment_dir, plot_name, args.eval_tpr)
-  logging.info("{}: loss {:>.3E} -- AUC {:>.3E} -- FPR {:>.3e}".format(
-                                      plot_name, epoch_loss, roc, fpr))
-  return (fpr, roc, epoch_loss)
+  logging.info("{}: loss {:>.3E} -- AUC {:>.3E} -- TPR {:>.3e}".format(
+                                      plot_name, epoch_loss, roc, tpr))
+  return (tpr, roc, epoch_loss)
 
 
 def main():
@@ -161,7 +161,7 @@ def main():
     try:
       args = utils.load_args(experiment_dir)
     except:
-      args.best_fpr = 1.0
+      args.best_tpr = 0.0
       args.nb_epochs_complete = 0 # Track in case training interrupted
       utils.save_args(experiment_dir, args) # Save initial args
 

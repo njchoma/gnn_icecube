@@ -24,6 +24,7 @@ BEST_MODEL = 'best_model.pkl'
 STATS_CSV  = 'training_stats.csv'
 NB_ZERO_NODES = 30 # Drastically improves performance
 PLOT_ZOOMS=[10**-k for k in [0,2,4,5]]
+CURRENT_BASELINE = [3*10**-6, 0.05]
 
 #####################################
 #     EXPERIMENT INITIALIZATION     #
@@ -40,7 +41,7 @@ def read_args():
 
   # Experiment
   add_arg('--name', help='Experiment reference name', required=True)
-  add_arg('--eval_tpr',help='TPR at which FPR will be evaluated', default=0.2)
+  add_arg('--eval_tpr',help='FPR at which TPR will be evaluated', default=0.000003)
   add_arg('--evaluate', help='Perform evaluation on test set only',action='store_true')
   add_arg('--save_best', help='Save best model', action='store_true')
   add_arg('--save_every_epoch', help='Save model after every epoch. Good if training expected to be interrupted', action='store_true')
@@ -104,7 +105,7 @@ def initialize_experiment(experiment_dir):
   csv_path = os.path.join(experiment_dir, STATS_CSV)
   with open(csv_path, 'w') as csvfile:
     writer = csv.writer(csvfile)
-    writer.writerow(['Epoch', 'lrate', 'train_fpr', 'train_roc', 'train_loss', 'val_fpr', 'val_roc', 'val_loss', 'running_loss'])
+    writer.writerow(['Epoch', 'lrate', 'train_tpr', 'train_roc', 'train_loss', 'val_tpr', 'val_roc', 'val_loss', 'running_loss'])
 
 
 #############################
@@ -277,26 +278,26 @@ def save_args(experiment_dir, args):
 ######################
 #     EVALUATION     #
 ######################
-def score_plot_preds(true_y, pred_y, weights, experiment_dir, plot_name, t=0.5):
+def score_plot_preds(true_y, pred_y, weights, experiment_dir, plot_name, f=0.5):
   '''
-  Compute and return weighted ROC AUC scores, FPR at given t (TPR).
+  Compute and return weighted ROC AUC scores, TPR at given f (FPR).
   Plot ROC curves and save plots.
   '''
   roc_score = roc_auc_score(true_y, pred_y, sample_weight=weights)
   fprs, tprs, thresholds = roc_curve(true_y, pred_y, sample_weight=weights)
-  # Compute FPR at specified t
-  fpr = 1.0
-  for i, tpr in enumerate(tprs):
-    if tpr > t:
-      fpr = fprs[i]
+  # Compute TPR at specified f
+  tpr = 0.0
+  for i, fpr in enumerate(fprs):
+    if fpr > f:
       break
+    tpr = tprs[i]
 
   # Plot ROC AUC curves
   for i, zoom in enumerate(PLOT_ZOOMS):
     fig_name = plot_name+'_{}_{}'.format(i, zoom)
-    plot_roc_curve(fprs, tprs, zoom, experiment_dir, fig_name, [fpr, t])
+    plot_roc_curve(fprs, tprs, zoom, experiment_dir, fig_name, [f, tpr])
 
-  return fpr, roc_score
+  return tpr, roc_score
 
 def plot_roc_curve(fprs, tprs, zoom, experiment_dir, plot_name, performance):
   '''
@@ -307,10 +308,12 @@ def plot_roc_curve(fprs, tprs, zoom, experiment_dir, plot_name, performance):
   plt.plot(fprs, tprs)
   # Zooms
   plt.xlim([0,zoom])
-  plt.ylim([0,zoom])
   # Style
   plt.xlabel("False Positive Rate (1- BG rejection)")
   plt.ylabel("True Positive Rate (Signal Efficiency)")
+  plt.scatter(performance[0], performance[1], label='GNN')
+  plt.scatter(CURRENT_BASELINE[0], CURRENT_BASELINE[1], label='Baseline')
+  plt.legend()
   plt.grid(linestyle=':')
   #Save
   plotfile = os.path.join(experiment_dir, '{}.png'.format(plot_name))
