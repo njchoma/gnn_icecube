@@ -95,7 +95,7 @@ def train(
   logging.warning("Training completed.")
 
 
-def evaluate(net, criterion, experiment_dir, args, in_X, in_y, in_w, plot_name):
+def evaluate(net, criterion, experiment_dir, args, in_X, in_y, in_w, plot_name, in_e=None, in_f=None):
   '''
   Evaluate network over the given set of samples
   '''
@@ -110,6 +110,8 @@ def evaluate(net, criterion, experiment_dir, args, in_X, in_y, in_w, plot_name):
   pred_y = np.zeros((nb_eval))
   true_y = np.zeros((nb_eval))
   weights = np.zeros((nb_eval))
+  evt_id = []
+  f_name = []
   # Get predictions and loss over batches
   logging.info("Evaluating {} {} samples.".format(nb_eval,plot_name))
   for i, batch in enumerate(batches):
@@ -129,6 +131,9 @@ def evaluate(net, criterion, experiment_dir, args, in_X, in_y, in_w, plot_name):
     pred_y[beg:end] = out.data.cpu().numpy()
     true_y[beg:end] = in_y[batch]
     weights[beg:end] = in_w[batch]
+    if in_e is not None:
+      evt_id.extend(in_e[batch])
+      f_name.extend(in_f[batch])
     # Print running loss 2 times 
     if (((i+1) % (nb_batches//2)) == 0):
       nb_proc = (i+1)*args.batch_size
@@ -140,6 +145,7 @@ def evaluate(net, criterion, experiment_dir, args, in_X, in_y, in_w, plot_name):
                                       experiment_dir, plot_name, args.eval_tpr)
   logging.info("{}: loss {:>.3E} -- AUC {:>.3E} -- TPR {:>.3e}".format(
                                       plot_name, epoch_loss, roc, tpr))
+  if in_e is not None: utils.save_preds(evt_id, f_name, pred_y, experiment_dir)
   return (tpr, roc, epoch_loss)
 
 
@@ -201,9 +207,9 @@ def main():
   except:
     logging.warning("Could not load best model for test set. Using current.")
   assert (args.test_file != None)
-  test_X, test_y, test_w, _, _= utils.load_dataset(args.test_file,args.nb_test)
+  test_X, test_y, test_w, test_e, test_f= utils.load_dataset(args.test_file,args.nb_test)
   test_stats = evaluate(net, criterion, experiment_dir, args,
-                            test_X, test_y, test_w, 'Test')
+                            test_X, test_y, test_w, 'Test', test_e, test_f)
 
 if __name__ == "__main__":
   main()

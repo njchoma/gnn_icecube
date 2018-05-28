@@ -340,3 +340,14 @@ def track_epoch_stats(epoch, lrate, train_loss, train_stats, val_stats, experime
   with open(csv_path, 'a') as csvfile:
     writer = csv.writer(csvfile)
     writer.writerow((epoch, lrate)+train_stats+val_stats+(train_loss,))
+
+def save_preds(evt_id, f_name, pred_y, experiment_dir):
+  '''
+  Save predicted outputs for predicted event id, filename.
+  '''
+  pred_file = os.path.join(experiment_dir, 'preds.csv')
+  with open(pred_file, 'x') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow(['event_id', 'filename', 'prediction'])
+    for e, f, y in zip(evt_id, f_name, pred_y):
+      writer.writerow((e, f, y))
