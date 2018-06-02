@@ -289,6 +289,11 @@ def score_plot_preds(true_y, pred_y, weights, experiment_dir, plot_name, f=0.5):
   tpr = 0.0
   for i, fpr in enumerate(fprs):
     if fpr > f:
+      try:
+        logging.warning("FPR: {}, TPR: {}, Threshold: {}".format(
+                          f, tpr, thresholds[i-1]))
+      except:
+        pass
       break
     tpr = tprs[i]
 
