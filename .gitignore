@@ -2,3 +2,4 @@
 models*
 run*
 slurm*
+*.swp
