@@ -204,8 +204,9 @@ def main():
   # Perform evaluation over test set
   try:
     net = utils.load_best_model(experiment_dir)
+    logging.warning("\nBest model loaded for evaluation on test set.")
   except:
-    logging.warning("Could not load best model for test set. Using current.")
+    logging.warning("\nCould not load best model for test set. Using current.")
   assert (args.test_file != None)
   test_X, test_y, test_w, test_e, test_f= utils.load_dataset(args.test_file,args.nb_test)
   test_stats = evaluate(net, criterion, experiment_dir, args,
