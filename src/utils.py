@@ -25,6 +25,8 @@ STATS_CSV  = 'training_stats.csv'
 NB_ZERO_NODES = 30 # Drastically improves performance
 PLOT_ZOOMS=[10**-k for k in [0,2,4,5]]
 CURRENT_BASELINE = [3*10**-6, 0.05]
+NB_N_FILES=17101
+NB_C_FILES=73665
 
 #####################################
 #     EXPERIMENT INITIALIZATION     #
@@ -117,6 +119,15 @@ def load_dataset(datafile, nb_ex):
   '''
   with open(datafile, 'rb') as filein:
     X, y, weights, event_id, filenames = pickle.load(filein)
+    avg_nb_samples = (NB_N_FILES + NB_C_FILES) / 2
+    n_reweight = avg_nb_samples / NB_N_FILES
+    c_reweight = avg_nb_samples / NB_C_FILES
+    # Reweight to be proportional to yearly events
+    for i in range(len(weights)):
+      if y[i] == 0:
+        weights[i] *= c_reweight
+      else:
+        weights[i] *= n_reweight
   return X[:nb_ex], y[:nb_ex], weights[:nb_ex],event_id[:nb_ex],filenames[:nb_ex]
 
 ####################
