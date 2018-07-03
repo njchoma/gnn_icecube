@@ -11,6 +11,15 @@ from sklearn.metrics import roc_auc_score
 import utils
 import model
 
+#####################
+#     CONSTANTS     #
+#####################
+TEST_NAME='Test'
+
+#######################
+#     EXPERIMENT      #
+#######################
+
 def train_one_epoch(net, criterion, optimizer, args, train_X, train_y, train_w):
   '''
   Train network for one epoch over the training set
@@ -146,6 +155,9 @@ def evaluate(net, criterion, experiment_dir, args, in_X, in_y, in_w, plot_name, 
   logging.info("{}: loss {:>.3E} -- AUC {:>.3E} -- TPR {:>.3e}".format(
                                       plot_name, epoch_loss, roc, tpr))
   if in_e is not None: utils.save_preds(evt_id, f_name, pred_y, experiment_dir)
+  # Save test numbers if evaluating on test set
+  if plot_name == TEST_NAME:
+    utils.save_test_scores(nb_eval, epoch_loss, tpr, roc, experiment_dir)
   return (tpr, roc, epoch_loss)
 
 
@@ -210,7 +222,7 @@ def main():
   assert (args.test_file != None)
   test_X, test_y, test_w, test_e, test_f= utils.load_dataset(args.test_file,args.nb_test)
   test_stats = evaluate(net, criterion, experiment_dir, args,
-                            test_X, test_y, test_w, 'Test', test_e, test_f)
+                            test_X, test_y, test_w, TEST_NAME, test_e, test_f)
 
 if __name__ == "__main__":
   main()
