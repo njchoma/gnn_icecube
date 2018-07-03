@@ -23,7 +23,6 @@ MODEL_NAME = 'model.pkl'
 BEST_MODEL = 'best_model.pkl'
 STATS_CSV  = 'training_stats.csv'
 NB_ZERO_NODES = 30 # Drastically improves performance
-PLOT_ZOOMS=[10**-k for k in [0,2,4,5]]
 CURRENT_BASELINE = [3*10**-6, 0.05]
 NB_N_FILES=17101
 NB_C_FILES=73665
@@ -308,22 +307,20 @@ def score_plot_preds(true_y, pred_y, weights, experiment_dir, plot_name, f=0.5):
       break
     tpr = tprs[i]
 
-  # Plot ROC AUC curves
-  for i, zoom in enumerate(PLOT_ZOOMS):
-    fig_name = plot_name+'_{}_{}'.format(i, zoom)
-    plot_roc_curve(fprs, tprs, zoom, experiment_dir, fig_name, [f, tpr])
+  # Plot ROC AUC curve
+  plot_roc_curve(fprs, tprs,  experiment_dir, plot_name, [f, tpr])
 
   return tpr, roc_score
 
-def plot_roc_curve(fprs, tprs, zoom, experiment_dir, plot_name, performance):
+def plot_roc_curve(fprs, tprs, experiment_dir, plot_name, performance):
   '''
-  Plot and save one ROC curve at specified zoom level.
+  Plot and save one ROC curve.
   '''
   # Plot
   plt.clf()
-  plt.plot(fprs, tprs)
+  plt.semilogx(fprs, tprs)
   # Zooms
-  plt.xlim([0,zoom])
+  plt.xlim([10**-7,1.0])
   plt.ylim([0,1.0])
   # Style
   plt.xlabel("False Positive Rate (1- BG rejection)")
