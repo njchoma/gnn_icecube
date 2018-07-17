@@ -40,7 +40,7 @@ def train_one_epoch(net, criterion, optimizer, args, train_X, train_y, train_w):
     loss = criterion(out, y, w)
     loss.backward()
     optimizer.step()
-    epoch_loss += loss.data[0] 
+    epoch_loss += loss.item()
     # Print running loss about 10 times during each epoch
     if (((i+1) % (nb_batches//10)) == 0):
       nb_proc = (i+1)*args.batch_size
@@ -133,7 +133,7 @@ def evaluate(net, criterion, experiment_dir, args, in_X, in_y, in_w, plot_name, 
     # Make predictions over batch
     out = net(X, adj_mask, batch_nb_nodes)
     loss = criterion(out, y, w)
-    epoch_loss += loss.data[0] 
+    epoch_loss += loss.item()
     # Track predictions, truth, weights over batches
     beg =     i * args.batch_size
     end = (i+1) * args.batch_size

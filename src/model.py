@@ -13,7 +13,7 @@ class Division_Tree(nn.Module):
   at each layer of tree.
   Leaf nodes of tree store adj matrix for subset of nodes.
   '''
-  def __init__(self, kernel, min_nodes=3, max_depth=13):
+  def __init__(self, kernel, min_nodes=30, max_depth=10):
     super(Division_Tree, self).__init__()
     self.min_nodes = min_nodes
     self.max_depth = max_depth
@@ -22,14 +22,12 @@ class Division_Tree(nn.Module):
   def forward(self, X):
     all_nodes, i, v = self.dfs(X, depth=1)
     batch, nb_nodes, nb_features = all_nodes.size()
-    print(v.size())
     if X.is_cuda:
       print("Sparse not implemented yet for cuda")
       exit()
     else:
       tensor = torch.sparse.FloatTensor
     adj = tensor(i, v, torch.Size([nb_nodes, nb_nodes]))
-    print(adj.size())
     return all_nodes, adj
 
   def _leaf_reached(self, nb_nodes, depth):
@@ -202,11 +200,7 @@ class Graph_Convolution(nn.Module):
     self.fc = nn.Linear(input_dim*2, nb_hidden)
 
   def forward(self, emb, adj):
-    print(emb.size())
-    print(adj.size())
     spread = torch.mm(adj, emb.squeeze(0)) # Apply adjacency matrix
-    print(spread.size())
-    exit()
     spread = spread.unsqueeze(0)
     spread = torch.cat((spread, emb), 2) # Concatenate with original signal
     emb_out = self.fc(spread) # Apply affine transformation
