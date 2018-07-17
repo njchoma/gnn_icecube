@@ -62,6 +62,19 @@ class Division_Tree(nn.Module):
     i = torch.cat((a.unsqueeze(0),b.unsqueeze(0)),0)
     return i
 
+  def _get_sparse_adj_indices(self, nb_nodes):
+    i = torch.arange(0,nb_nodes).type(torch.LongTensor)
+    new_node = torch.LongTensor([nb_nodes]).repeat(nb_nodes)
+    i = torch.cat((i.unsqueeze(0),new_node.unsqueeze(0)),0)
+    return i
+
+  def _get_new_node(self, X):
+    '''
+    Takes point cloud as input and returns a new node which
+    somehow summarizes the point cloud (in this case the mean).
+    '''
+    return X.mean(1,keepdim=True)
+
   def dfs(self, X, depth):
     batch, nb_nodes, nb_features = X.size()
     if self._leaf_reached(X.size(1), depth):
@@ -83,6 +96,13 @@ class Division_Tree(nn.Module):
       # Combine adj indices and values from left, right
       i = torch.cat((l_i, r_i), 1)
       v = torch.cat((l_v, r_v))
+      # Make new data point and new adjacency connections
+      new_node = self._get_new_node(all_nodes)
+      new_i = self._get_sparse_adj_indices(all_nodes.size(1))
+      new_v = self.kernel(all_nodes, new_node.repeat(1,all_nodes.size(1),1)).squeeze(0)
+      all_nodes = torch.cat((all_nodes, new_node),dim=1)
+      i = torch.cat((i, new_i),dim=1)
+      v = torch.cat((v, new_v))
       return all_nodes, i, v
 
 class Rand_Tree(Division_Tree):
@@ -157,7 +177,7 @@ class GNN(nn.Module):
     for i, layer in enumerate(self.layers):
       emb, adj = layer(emb, adj, mask, batch_nb_nodes)
     # Apply final readout and return
-    emb = mask_embedding(emb, mask).sum(1)
+    emb = emb.sum(1)
     emb = self.readout_norm(emb.unsqueeze(1)).squeeze(1)
     # Logistic regression
     emb = self.readout_fc(emb)
@@ -178,9 +198,7 @@ class GNN_Layer(nn.Module):
   def forward(self, emb, adj, mask, batch_nb_nodes):
     # Optionally normalize embedding
     if self.apply_norm:
-      emb = batch_norm_with_padding(emb, mask, batch_nb_nodes)
-    # Ensure no signal on padded nodes
-    emb = mask_embedding(emb, mask)
+      emb = batch_norm(emb, mask, batch_nb_nodes)
     # Apply convolution
     embA = self.convA(emb, adj)
     embB = self.convB(emb, adj)
@@ -255,14 +273,14 @@ def mean_with_padding(emb, mask, batch_nb_nodes):
   batch_div_by = batch_nb_nodes.unsqueeze(1).repeat(1,emb.size()[2])
   return summed / (batch_div_by + 10**-20)
 
-def batch_norm_with_padding(emb, mask, batch_nb_nodes):
+def batch_norm(emb, mask, batch_nb_nodes):
   '''
   Normalizes each feature within each sample to mean zero, var 1
   '''
-  mean = mean_with_padding(emb, mask, batch_nb_nodes)
+  mean = emb.mean(1)
   emb_centered = emb-mean.unsqueeze(1)
 
-  var = mean_with_padding(emb_centered**2, mask, batch_nb_nodes) + 10**-20
+  var = (emb_centered**2).mean(1) + 10**-20
   emb_norm = emb_centered / var.sqrt().unsqueeze(1)
   return emb_norm
 
