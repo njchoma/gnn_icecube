@@ -3,3 +3,4 @@ models*
 run*
 slurm*
 *.swp
+.nfs*
