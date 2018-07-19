@@ -24,8 +24,10 @@ BEST_MODEL = 'best_model.pkl'
 STATS_CSV  = 'training_stats.csv'
 NB_ZERO_NODES = 00 # Drastically improves performance
 CURRENT_BASELINE = [3*10**-6, 0.05]
+'''
 NB_N_FILES=17101
 NB_C_FILES=73665
+'''
 
 #####################################
 #     EXPERIMENT INITIALIZATION     #
@@ -118,6 +120,7 @@ def load_dataset(datafile, nb_ex):
   '''
   with open(datafile, 'rb') as filein:
     X, y, weights, event_id, filenames = pickle.load(filein)
+    '''
     avg_nb_samples = (NB_N_FILES + NB_C_FILES) / 2
     n_reweight = avg_nb_samples / NB_N_FILES
     c_reweight = avg_nb_samples / NB_C_FILES
@@ -127,6 +130,7 @@ def load_dataset(datafile, nb_ex):
         weights[i] *= c_reweight
       else:
         weights[i] *= n_reweight
+    '''
   return X[:nb_ex], y[:nb_ex], weights[:nb_ex],event_id[:nb_ex],filenames[:nb_ex]
 
 ####################

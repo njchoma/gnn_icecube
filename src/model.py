@@ -7,11 +7,12 @@ from torch.autograd import Variable
 ##########################
 class Division_Tree(nn.Module):
   '''
-  Recursively divide the point cloud input into subsets.
-  Build binary tree associated with splits.
-  Permute point cloud s.t. binary tree divides point cloud around a pivot
-  at each layer of tree.
-  Leaf nodes of tree store adj matrix for subset of nodes.
+  Recursively divide the point cloud input into subsets, traversing implicit
+  binary tree.
+  Add dense edges at leaf level.
+  At inner tree nodes, add new point which then connects to all
+  points within subtree.
+  Then construct sparse adjacency matrix for O(nlogn) complexity.
   '''
   def __init__(self, kernel, min_nodes=30, max_depth=10):
     super(Division_Tree, self).__init__()
@@ -23,8 +24,7 @@ class Division_Tree(nn.Module):
     all_nodes, i, v = self.dfs(X, depth=1)
     batch, nb_nodes, nb_features = all_nodes.size()
     if X.is_cuda:
-      print("Sparse not implemented yet for cuda")
-      exit()
+      tensor = torch.cuda.sparse.FloatTensor
     else:
       tensor = torch.sparse.FloatTensor
     adj = tensor(i, v, torch.Size([nb_nodes, nb_nodes]))
@@ -49,7 +49,7 @@ class Division_Tree(nn.Module):
     Returns cartesian product of size n^2 x 2m.
     '''
     batch, nb_node, fmap = X.size()
-    a = X.repeat(1,1,nb_node).resize(batch, nb_node*nb_node, fmap)
+    a = X.repeat(1,1,nb_node).resize_(batch, nb_node*nb_node, fmap)
     b = X.repeat(1,nb_node,1)
     c = torch.cat((a,b),2)
     return c
@@ -66,6 +66,9 @@ class Division_Tree(nn.Module):
     i = torch.arange(0,nb_nodes).type(torch.LongTensor)
     new_node = torch.LongTensor([nb_nodes]).repeat(nb_nodes)
     i = torch.cat((i.unsqueeze(0),new_node.unsqueeze(0)),0)
+    i_prime = torch.cat((i[1:2], i[0:1]),0)
+    i = torch.cat((i, i_prime),1)
+    i = torch.cat((i, torch.LongTensor([[nb_nodes],[nb_nodes]])),1)
     return i
 
   def _get_new_node(self, X):
@@ -102,7 +105,9 @@ class Division_Tree(nn.Module):
       new_v = self.kernel(all_nodes, new_node.repeat(1,all_nodes.size(1),1)).squeeze(0)
       all_nodes = torch.cat((all_nodes, new_node),dim=1)
       i = torch.cat((i, new_i),dim=1)
-      v = torch.cat((v, new_v))
+      v = torch.cat((v, new_v, new_v, torch.FloatTensor([1.0]))) # Add 1.0 for new node
+      nb_nodes = all_nodes.size(1)
+      t = torch.sparse.FloatTensor(i, v, torch.Size([nb_nodes, nb_nodes]))
       return all_nodes, i, v
 
 class Rand_Tree(Division_Tree):
