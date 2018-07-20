@@ -14,14 +14,17 @@ class Division_Tree(nn.Module):
   points within subtree.
   Then construct sparse adjacency matrix for O(nlogn) complexity.
   '''
-  def __init__(self, kernel, min_nodes=30, max_depth=10):
+  def __init__(self, kernel, min_nodes=40, max_depth=10):
     super(Division_Tree, self).__init__()
     self.min_nodes = min_nodes
     self.max_depth = max_depth
     self.kernel = kernel
+    self.pad = nn.ConstantPad1d((0,1),0.0)
 
   def forward(self, X):
-    all_nodes, i, v = self.dfs(X, depth=1)
+    # Append zero-padding to indicate true node
+    all_nodes = self.pad(X)
+    all_nodes, i, v = self.dfs(all_nodes, depth=1)
     batch, nb_nodes, nb_features = all_nodes.size()
     if X.is_cuda:
       tensor = torch.cuda.sparse.FloatTensor
@@ -76,7 +79,9 @@ class Division_Tree(nn.Module):
     Takes point cloud as input and returns a new node which
     somehow summarizes the point cloud (in this case the mean).
     '''
-    return X.mean(1,keepdim=True)
+    new_node = X.mean(1,keepdim=True)
+    new_node[:,:,-1] = 1.0 # Set indicator that node is added
+    return new_node
 
   def dfs(self, X, depth):
     batch, nb_nodes, nb_features = X.size()
@@ -108,6 +113,7 @@ class Division_Tree(nn.Module):
       v = torch.cat((v, new_v, new_v, torch.FloatTensor([1.0]))) # Add 1.0 for new node
       nb_nodes = all_nodes.size(1)
       t = torch.sparse.FloatTensor(i, v, torch.Size([nb_nodes, nb_nodes]))
+      adj = torch.sparse.FloatTensor(i, v, torch.Size([nb_nodes, nb_nodes]))
       return all_nodes, i, v
 
 class Rand_Tree(Division_Tree):

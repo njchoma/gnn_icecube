@@ -162,7 +162,7 @@ def evaluate(net, criterion, experiment_dir, args, in_X, in_y, in_w, plot_name, 
 
 
 def main():
-  input_dim=6
+  input_dim=7
   spatial_dims=[0,1,2]
   args = utils.read_args()
 
