@@ -1,3 +1,4 @@
+pg_models
 *.pyc
 models*
 run*

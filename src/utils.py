@@ -24,6 +24,7 @@ BEST_MODEL = 'best_model.pkl'
 STATS_CSV  = 'training_stats.csv'
 NB_ZERO_NODES = 00 # Drastically improves performance
 CURRENT_BASELINE = [3*10**-6, 0.05]
+MODEL_DIR = 'pg_models'
 '''
 NB_N_FILES=17101
 NB_C_FILES=73665
@@ -84,7 +85,7 @@ def get_experiment_dir(experiment_name):
   Returns path to the specific experiment within the 'models' directory.
   '''
   current_dir = os.getcwd()
-  save_dir = os.path.join(current_dir, 'models')
+  save_dir = os.path.join(current_dir, MODEL_DIR)
   if not os.path.exists(save_dir):
     os.mkdir(save_dir) # Create models dir which will contain experiment data
   return os.path.join(save_dir, experiment_name)
