@@ -21,7 +21,7 @@ class PG_Tree(nn.Module):
   The output is an augmented point cloud, sparse adjacency matrix, and 
     the sum of probabilities of all paths taken.
   '''
-  def __init__(self, input_dim, max_nodes=10, max_depth=10):
+  def __init__(self, input_dim, max_nodes=10, max_depth=2):
     '''
     max_nodes is the maximum number of nodes which can belong to a cluster.
     max_depth is the max level of recursion. Prioritized over max_nodes.
