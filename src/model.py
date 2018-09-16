@@ -227,14 +227,20 @@ class Subtree(object):
     subtree_splits = splits[self.node_indices]
     l_split = (subtree_splits < 0.5).nonzero()
     r_split = (subtree_splits > 0.5).nonzero()
-    l_nodes = self.node_indices[l_split].squeeze(1)
-    r_nodes = self.node_indices[r_split].squeeze(1)
-    l_subtree = Subtree(l_nodes, self.max_nodes, self.parent_nodes)
-    r_subtree = Subtree(r_nodes, self.max_nodes, self.parent_nodes.clone())
     subN = [] # new
     subD = [] # dense
-    subD.append(l_subtree) if l_subtree.leaf else subN.append(l_subtree)
-    subD.append(r_subtree) if r_subtree.leaf else subN.append(r_subtree)
+    try:
+      l_nodes = self.node_indices[l_split].squeeze(1)
+      l_subtree = Subtree(l_nodes, self.max_nodes, self.parent_nodes)
+      subD.append(l_subtree) if l_subtree.leaf else subN.append(l_subtree)
+    except:
+      pass
+    try:
+      r_nodes = self.node_indices[r_split].squeeze(1)
+      r_subtree = Subtree(r_nodes, self.max_nodes, self.parent_nodes.clone())
+      subD.append(r_subtree) if r_subtree.leaf else subN.append(r_subtree)
+    except:
+      pass
     return subN, subD
 
 class PG_MLP(nn.Module):
@@ -447,7 +453,7 @@ class GNN(nn.Module):
     t1 = time.time()
     '''
     emb = emb.unsqueeze(0)
-    print(emb.size(), nb_edges)
+    # print(emb.size(), nb_edges)
     batch_size, nb_pts, input_dim  = emb.size()
     # Run through layers
     for i, layer in enumerate(self.layers):
