@@ -15,6 +15,7 @@ import model
 #     CONSTANTS     #
 #####################
 TEST_NAME='Test'
+RUN_LOSS_HISTORY=0.99
 
 #######################
 #     EXPERIMENT      #
@@ -29,6 +30,7 @@ def train_one_epoch(net, criterion, optimizer, args, train_X, train_y, train_w):
   batches = utils.get_batches(nb_train, args.batch_size)
   nb_batches = len(batches)
   epoch_loss = 0
+  running_loss = None
   for i, batch in enumerate(batches):
     optimizer.zero_grad()
     X, y, w, adj_mask, batch_nb_nodes = utils.batch_sample(
@@ -36,11 +38,19 @@ def train_one_epoch(net, criterion, optimizer, args, train_X, train_y, train_w):
                                               train_y[batch],
                                               train_w[batch]
                                               )
-    out = net(X, adj_mask, batch_nb_nodes)
+    out, pg_probs = net(X, adj_mask, batch_nb_nodes)
     loss = criterion(out, y, w)
-    loss.backward()
+    loss.backward(retain_graph=True)
+    # Compute rewarded policy gradient
+    l = loss.item()
+    if running_loss==None:
+      running_loss = l
+    running_loss = running_loss * RUN_LOSS_HISTORY + l * (1-RUN_LOSS_HISTORY)
+    reward = l - running_loss
+    pg_probs = pg_probs * reward # higher reward is worse in pytorch
+    pg_probs.backward()
     optimizer.step()
-    epoch_loss += loss.item()
+    epoch_loss += l
     # Print running loss about 10 times during each epoch
     if (((i+1) % (nb_batches//10)) == 0):
       nb_proc = (i+1)*args.batch_size
@@ -65,10 +75,15 @@ def train(
   # Nb epochs completed tracked in case training interrupted
   for i in range(args.nb_epochs_complete, args.nb_epoch):
     # Update learning rate in optimizer
-    optimizer = torch.optim.Adamax(net.parameters(), lr=args.lrate)
+    optimizer = torch.optim.Adamax([
+                    {'params':net.layers.parameters()},
+                    {'params':net.readout_fc.parameters()},
+                    {'params':net.readout_norm.parameters()},
+                    {'params':net.create_sparse_graph.parameters(),'lr':args.pg_lrate}],
+                    lr=args.lrate)
     t0 = time.time()
     logging.info("\nEpoch {}".format(i+1))
-    logging.info("Learning rate: {0:.3g}".format(args.lrate))
+    logging.info("Learning rate: {0:.3g}, pg: {0:.3g}".format(args.lrate, args.pg_lrate))
     # Train for one epoch
     train_loss = train_one_epoch(net, criterion, optimizer, args, 
                                  train_X, train_y, train_w)
@@ -131,7 +146,7 @@ def evaluate(net, criterion, experiment_dir, args, in_X, in_y, in_w, plot_name, 
                                               in_w[batch]
                                               )
     # Make predictions over batch
-    out = net(X, adj_mask, batch_nb_nodes)
+    out, pg_probs = net(X, adj_mask, batch_nb_nodes)
     loss = criterion(out, y, w)
     epoch_loss += loss.item()
     # Track predictions, truth, weights over batches

@@ -161,8 +161,14 @@ class PG_Tree(nn.Module):
     probs = self.pg_mlp(all_feats)[:,0]
     splits = torch.bernoulli(probs)
     # Sum probabilities for all splits for policy gradient
-    one_class = (splits > 0.5).nonzero()[:,0]
-    zero_class = (splits < 0.5).nonzero()[:,0]
+    try:
+      one_class = (splits > 0.5).nonzero()[:,0]
+    except:
+      one_class = []
+    try:
+      zero_class = (splits < 0.5).nonzero()[:,0]
+    except:
+      zero_class = []
     # Mask probabilities for any nodes which are already in a leaf
     one_class_mask = pg_mask[one_class]
     zero_class_mask = pg_mask[zero_class]
@@ -469,7 +475,7 @@ class GNN(nn.Module):
     print("Time to make adj:  {:.4f}".format(t1-t0))
     print("Time for all else: {:.4f}".format(t2-t1))
     '''
-    return emb
+    return emb, sum_probs
 
 class GNN_Layer(nn.Module):
   def __init__(self, input_dim, nb_hidden, kernel=None, apply_norm=True, residual=True):

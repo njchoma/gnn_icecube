@@ -24,7 +24,7 @@ BEST_MODEL = 'best_model.pkl'
 STATS_CSV  = 'training_stats.csv'
 NB_ZERO_NODES = 00 # Drastically improves performance
 CURRENT_BASELINE = [3*10**-6, 0.05]
-MODEL_DIR = 'pg_models'
+MODEL_DIR = 'models_pg'
 '''
 NB_N_FILES=17101
 NB_C_FILES=73665
@@ -53,6 +53,7 @@ def read_args():
   # Training
   add_arg('--nb_epoch', help='Number of epochs to train', type=int, default=2)
   add_arg('--lrate', help='Initial learning rate', type=float, default = 0.005)
+  add_arg('--pg_lrate', help='Policy gradient learn rate', type=float, default = 0.005)
   add_arg('--lrate_decay',help='Exponential decay factor',type=float,default=0.96)
   add_arg('--batch_size', help='Size of each minibatch', type=int, default=4)
 
