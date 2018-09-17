@@ -48,7 +48,10 @@ def train_one_epoch(net, criterion, optimizer, args, train_X, train_y, train_w):
     running_loss = running_loss * RUN_LOSS_HISTORY + l * (1-RUN_LOSS_HISTORY)
     reward = l - running_loss
     pg_probs = pg_probs * reward # higher reward is worse in pytorch
-    pg_probs.backward()
+    try:
+      pg_probs.backward()
+    except:
+      pass
     optimizer.step()
     epoch_loss += l
     # Print running loss about 10 times during each epoch
@@ -83,7 +86,7 @@ def train(
                     lr=args.lrate)
     t0 = time.time()
     logging.info("\nEpoch {}".format(i+1))
-    logging.info("Learning rate: {0:.3g}, pg: {0:.3g}".format(args.lrate, args.pg_lrate))
+    logging.info("Learning rate: {:.3g}, pg: {:.3g}".format(args.lrate, args.pg_lrate))
     # Train for one epoch
     train_loss = train_one_epoch(net, criterion, optimizer, args, 
                                  train_X, train_y, train_w)

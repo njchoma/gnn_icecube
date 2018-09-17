@@ -5,6 +5,11 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
+#####################
+#     CONSTANTS     #
+#####################
+GAUSSIAN_SIGMA = 0.5
+
 if torch.cuda.is_available():
   t_type = torch.cuda
 else:
@@ -32,6 +37,7 @@ class PG_Tree(nn.Module):
     self.nb_new_features = input_dim-1 # no indicator yet for real/fake nodes
     self.pg_mlp = PG_MLP((input_dim-1)+self.nb_new_features, nb_hidden=32)
     self.batch_norm = nn.BatchNorm1d(input_dim-1)
+    self.kernel = Gaussian()
 
   def forward(self, X_in):
     '''
@@ -40,6 +46,7 @@ class PG_Tree(nn.Module):
     # Initialize for DFS
     self._initialize_dfs(X_in)
     X_norm = self.batch_norm(X_in) # IMPORTANT FOR PG!!
+    torch.set_printoptions(precision=3)
     # Build X features and initial subtree (contains all nodes)
     pg_mask = make_ones(self.nb_nodes, cuda=X_in.is_cuda)
     full_tree = Subtree(t_type.LongTensor(np.arange(self.nb_nodes)),
@@ -112,9 +119,13 @@ class PG_Tree(nn.Module):
     nb_edges = idx.size(1)
     idxA = idx[0].reshape(nb_edges, 1)
     idxB = idx[1].reshape(nb_edges, 1)
-    idx_pairs = torch.cat((idxA, idxB),dim=1)
+    '''
     # Use binary edges for now since can't learn in kernel for sparse adj.
     v = make_ones(nb_edges, cuda=X.is_cuda)
+    '''
+    nodesA = X[idxA].squeeze(1).unsqueeze(0)
+    nodesB = X[idxB].squeeze(1).unsqueeze(0)
+    v = self.kernel(nodesA, nodesB).squeeze(0)
     return v
 
   def gather_nodes(self, X_in):
@@ -297,7 +308,7 @@ class Division_Tree(nn.Module):
     else:
       tensor = torch.sparse.FloatTensor
     adj = tensor(i, v, torch.Size([nb_nodes, nb_nodes]))
-    return all_nodes, adj
+    return all_nodes, adj, 0, 0
 
   def _leaf_reached(self, nb_nodes, depth):
     if (nb_nodes <= self.min_nodes) or (depth == self.max_depth):
@@ -452,13 +463,15 @@ class GNN(nn.Module):
     '''
     print(emb.size())
     t0 = time.time()
+    emb, adj, sum_probs, nb_edges = self.create_sparse_graph(emb.cpu())
+    emb = emb.cuda()
+    adj = adj.cuda()
     '''
-    # emb, adj = self.create_sparse_graph(emb)
     emb, adj, sum_probs, nb_edges = self.create_sparse_graph(emb.squeeze(0))
+    emb = emb.unsqueeze(0)
     '''
     t1 = time.time()
     '''
-    emb = emb.unsqueeze(0)
     # print(emb.size(), nb_edges)
     batch_size, nb_pts, input_dim  = emb.size()
     # Run through layers
@@ -529,7 +542,7 @@ class Gaussian(nn.Module):
   '''
   def __init__(self, spatial_coords=None):
     super(Gaussian, self).__init__()
-    self.sigma = 100.0
+    self.sigma = GAUSSIAN_SIGMA
     self.spatial_coords = spatial_coords
 
   def forward(self, emb_in_0, emb_in_1):
