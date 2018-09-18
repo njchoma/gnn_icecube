@@ -26,7 +26,7 @@ class PG_Tree(nn.Module):
   The output is an augmented point cloud, sparse adjacency matrix, and 
     the sum of probabilities of all paths taken.
   '''
-  def __init__(self, input_dim, max_nodes=10, max_depth=2):
+  def __init__(self, input_dim, spatial_dims=None, max_nodes=10, max_depth=2):
     '''
     max_nodes is the maximum number of nodes which can belong to a cluster.
     max_depth is the max level of recursion. Prioritized over max_nodes.
@@ -36,8 +36,7 @@ class PG_Tree(nn.Module):
     self.max_depth = max_depth
     self.nb_new_features = input_dim-1 # no indicator yet for real/fake nodes
     self.pg_mlp = PG_MLP((input_dim-1)+self.nb_new_features, nb_hidden=32)
-    self.batch_norm = nn.BatchNorm1d(input_dim-1)
-    self.kernel = Gaussian()
+    self.kernel = Gaussian(spatial_dims)
 
   def forward(self, X_in):
     '''
@@ -45,16 +44,15 @@ class PG_Tree(nn.Module):
     '''
     # Initialize for DFS
     self._initialize_dfs(X_in)
-    X_norm = self.batch_norm(X_in) # IMPORTANT FOR PG!!
     torch.set_printoptions(precision=3)
     # Build X features and initial subtree (contains all nodes)
     pg_mask = make_ones(self.nb_nodes, cuda=X_in.is_cuda)
     full_tree = Subtree(t_type.LongTensor(np.arange(self.nb_nodes)),
                         self.max_nodes, t_type.LongTensor([]))
     # DFS
-    pg_sum = self.dfs(X_norm, [full_tree], pg_mask, depth=0)
+    pg_sum = self.dfs(X_in, [full_tree], pg_mask, depth=0)
     # Prepare augmented nodes
-    X_updated = self.gather_nodes(X_norm)
+    X_updated = self.gather_nodes(X_in)
     # Set adjacency edge values
     v = self.set_edge_values(X_updated)
     # Make sparse adj
@@ -443,7 +441,7 @@ class GNN(nn.Module):
   def __init__(self, nb_hidden, nb_layer, input_dim, spatial_dims=None):
     super(GNN, self).__init__()
     # Initialize GNN layers
-    self.create_sparse_graph = PG_Tree(input_dim)
+    self.create_sparse_graph = PG_Tree(input_dim, spatial_dims)
     # self.create_sparse_graph = Rand_Tree(Gaussian(spatial_dims))
     first_layer = GNN_Layer(
                             input_dim, 
@@ -457,6 +455,7 @@ class GNN(nn.Module):
     self.readout_fc = nn.Linear(nb_hidden, 1)
     self.readout_norm = nn.InstanceNorm1d(1)
     self.readout_act = nn.Sigmoid()
+    self.bn = nn.BatchNorm1d(input_dim -1)
 
   def forward(self, emb, mask, batch_nb_nodes):
     # Create sparse graph where adj is approx nlogn sized and sparse
@@ -467,7 +466,16 @@ class GNN(nn.Module):
     emb = emb.cuda()
     adj = adj.cuda()
     '''
-    emb, adj, sum_probs, nb_edges = self.create_sparse_graph(emb.squeeze(0))
+    # Normalize for PG
+    emb = emb.squeeze(0)
+    emb2 = self.bn(emb)
+    mean = emb.mean(0)
+    std  = emb.std(0) + 10**-20
+    emb = (emb-mean) / std
+    # Run PG to get adj
+    emb, adj, sum_probs, nb_edges = self.create_sparse_graph(emb)
+    # Un-normalize
+    emb[:,:-1] = emb[:,:-1]*std + mean
     emb = emb.unsqueeze(0)
     '''
     t1 = time.time()
