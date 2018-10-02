@@ -39,6 +39,7 @@ class PG_Tree(nn.Module):
     self.nb_new_features = input_dim-1 # no indicator yet for real/fake nodes
     self.subtree_divider = None
     self.kernel = kernel
+    self.construct_adj = sparse_with_grad.Construct_Adj.apply
 
   def forward(self, X_in):
     '''
@@ -59,7 +60,7 @@ class PG_Tree(nn.Module):
     v = self.set_edge_values(X_updated)
     # Make sparse adj
     nb_nodes = X_updated.size(0)
-    adj = t_type.sparse.FloatTensor(self.indices, v, torch.Size([nb_nodes, nb_nodes]))
+    adj = self.construct_adj(self.indices, v, torch.Size([nb_nodes, nb_nodes]))
     return X_updated, adj, pg_sum, v.size(0)
 
   def _initialize_dfs(self, X_in):

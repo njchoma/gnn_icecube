@@ -107,9 +107,10 @@ class Graph_Convolution(nn.Module):
   def __init__(self, input_dim, nb_hidden):
     super(Graph_Convolution, self).__init__()
     self.fc = nn.Linear(input_dim*2, nb_hidden)
+    self.spmm = sparse_with_grad.SPMM.apply
 
   def forward(self, emb, adj):
-    spread = torch.mm(adj, emb.squeeze(0)) # Apply adjacency matrix
+    spread = self.spmm(adj, emb.squeeze(0)) # Apply adjacency matrix
     spread = spread.unsqueeze(0)
     spread = torch.cat((spread, emb), 2) # Concatenate with original signal
     emb_out = self.fc(spread) # Apply affine transformation
