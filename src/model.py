@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
-import utils_model
+import utils_model as utils
 import graph_construct
 import kernels
 import sparse_with_grad
@@ -23,7 +23,7 @@ class GNN(nn.Module):
   def __init__(self, nb_hidden, nb_layer, input_dim, spatial_dims=None):
     super(GNN, self).__init__()
     # Initialize GNN layers
-    self.create_sparse_graph = graph_construct.Rand_Tree(
+    self.create_sparse_graph = graph_construct.MLP_PG(
                                               input_dim=input_dim,
                                               kernel=kernels.MLP(input_dim,1024),
                                               spatial_dims=spatial_dims
@@ -32,7 +32,6 @@ class GNN(nn.Module):
     first_layer = GNN_Layer(
                             input_dim, 
                             nb_hidden, 
-                            kernel=Gaussian(spatial_dims),
                             apply_norm=False
                            )
     rem_layers = [GNN_Layer(nb_hidden, nb_hidden) for _ in range(nb_layer-1)]
@@ -41,7 +40,6 @@ class GNN(nn.Module):
     self.readout_fc = nn.Linear(nb_hidden, 1)
     self.readout_norm = nn.InstanceNorm1d(1)
     self.readout_act = nn.Sigmoid()
-    self.bn = nn.BatchNorm1d(input_dim -1)
 
   def forward(self, emb, mask, batch_nb_nodes):
     # Create sparse graph where adj is approx nlogn sized and sparse
@@ -52,16 +50,9 @@ class GNN(nn.Module):
     emb = emb.cuda()
     adj = adj.cuda()
     '''
-    # Normalize for PG
     emb = emb.squeeze(0)
-    emb2 = self.bn(emb)
-    mean = emb.mean(0)
-    std  = emb.std(0) + 10**-20
-    emb = (emb-mean) / std
     # Run PG to get adj
     emb, adj, sum_probs, nb_edges = self.create_sparse_graph(emb)
-    # Un-normalize
-    emb[:,:-1] = emb[:,:-1]*std + mean
     emb = emb.unsqueeze(0)
     '''
     t1 = time.time()
@@ -98,7 +89,7 @@ class GNN_Layer(nn.Module):
   def forward(self, emb, adj, mask, batch_nb_nodes):
     # Optionally normalize embedding
     if self.apply_norm:
-      emb = batch_norm(emb, mask, batch_nb_nodes)
+      emb = utils.batch_norm(emb, mask, batch_nb_nodes)
     # Apply convolution
     embA = self.convA(emb, adj)
     embB = self.convB(emb, adj)

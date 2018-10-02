@@ -8,7 +8,7 @@ import torch.nn as nn
 
 from sklearn.metrics import roc_auc_score
 
-import utils_experiment
+import utils_experiment as utils
 import model
 
 #####################

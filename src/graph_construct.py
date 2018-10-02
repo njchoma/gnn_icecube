@@ -1,6 +1,10 @@
+import numpy as np
+
 import torch
+import torch.nn as nn
 
 import sparse_with_grad
+import utils_model as utils
 
 #####################
 #     CONSTANTS     #
@@ -12,20 +16,6 @@ if torch.cuda.is_available():
   t_type = torch.cuda
 else:
   t_type = torch
-
-#####################################################
-#           CHILD CLASS PG GRAPH CONSTRUCT          #
-#####################################################
-class MLP_PG(PG_Tree):
-  def __init__(self, input_dim, kernel, spatial_dims=None, max_nodes=MAX_DEPTH, max_depth=MAX_DEPTH):
-    super(MLP_PG, self).__init__(input_dim, kernel, spatial_dims, max_nodes, max_depth)
-    self.subtree_divider = MLP_Divide((input_dim-1)+self.nb_new_features, nb_hidden=1024)
-
-class Rand_Tree(PG_Tree):
-  def __init__(self, input_dim, kernel, spatial_dims=None, max_nodes=MAX_DEPTH, max_depth=MAX_DEPTH):
-    super(Rand_Tree, self).__init__(input_dim, kernel, spatial_dims, max_nodes, max_depth)
-    self.subtree_divider = Random_Divide()
-
 
 #########################################################
 #               ABSTRACT GRAPH CONSTRUCTOR              #
@@ -58,7 +48,7 @@ class PG_Tree(nn.Module):
     self._initialize_dfs(X_in)
     torch.set_printoptions(precision=3)
     # Build X features and initial subtree (contains all nodes)
-    pg_mask = make_ones(self.nb_nodes, cuda=X_in.is_cuda)
+    pg_mask = utils.make_ones(self.nb_nodes, cuda=X_in.is_cuda)
     full_tree = Subtree(t_type.LongTensor(np.arange(self.nb_nodes)),
                         self.max_nodes, t_type.LongTensor([]))
     # DFS
@@ -82,15 +72,13 @@ class PG_Tree(nn.Module):
     self.indices = t_type.LongTensor([])
 
   def dfs(self, X_in, subtrees, pg_mask, depth):
-    '''
-    '''
     for s in subtrees:
       # Set aggregate (e.g. mean, var) information
       s.set_features(X_in)
       # Build new points for each subtree
       self.create_new_node(X_in, s)
     # Add aggregate features to input nodes
-    agg_feats = make_zeros((self.nb_nodes, self.nb_new_features), cuda=X_in.is_cuda)
+    agg_feats = utils.make_zeros((self.nb_nodes, self.nb_new_features), cuda=X_in.is_cuda)
     for s in subtrees:
       agg_feats[s.node_indices] = s.features
     all_feats = torch.cat((X_in, agg_feats),dim=1)
@@ -143,11 +131,11 @@ class PG_Tree(nn.Module):
     Put indicater variable on augmented nodes and add to X_in
     '''
     # Put zeros on real nodes
-    zeros = make_zeros((X_in.size(0),1), cuda=X_in.is_cuda)
+    zeros = utils.make_zeros((X_in.size(0),1), cuda=X_in.is_cuda)
     X = torch.cat((X_in, zeros),dim=1)
     # Put ones on augmented nodes
     X_aug = torch.cat(self.new_nodes,dim=0)
-    ones = make_ones((X_aug.size(0),1), X_in.is_cuda)
+    ones = utils.make_ones((X_aug.size(0),1), X_in.is_cuda)
     X_aug = torch.cat((X_aug, ones),dim=1)
     # Concatenate all nodes
     X_all = torch.cat((X, X_aug),dim=0)
@@ -280,7 +268,7 @@ class MLP_Divide(nn.Module):
   One-layer MLP.
   '''
   def __init__(self, nb_input, nb_hidden):
-    super(PG_MLP, self).__init__()
+    super(MLP_Divide, self).__init__()
     self.fc1 = nn.Linear(nb_input, nb_hidden)
     self.act1 = nn.SELU()
     self.fc2 = nn.Linear(nb_hidden, 1)
@@ -296,4 +284,19 @@ class Random_Divide(nn.Module):
     super(Random_Divide, self).__init__()
 
   def forward(self, X_in):
-    return torch.ones(X_in) / 2
+    return torch.ones((X_in.size(0),1)) / 2
+
+#####################################################
+#           CHILD CLASS PG GRAPH CONSTRUCT          #
+#####################################################
+class MLP_PG(PG_Tree):
+  def __init__(self, input_dim, kernel, spatial_dims=None, max_nodes=MAX_DEPTH, max_depth=MAX_DEPTH):
+    super(MLP_PG, self).__init__(input_dim, kernel, spatial_dims, max_nodes, max_depth)
+    self.subtree_divider = MLP_Divide((input_dim-1)+self.nb_new_features, nb_hidden=1024)
+
+class Rand_Tree(PG_Tree):
+  def __init__(self, input_dim, kernel, spatial_dims=None, max_nodes=MAX_DEPTH, max_depth=MAX_DEPTH):
+    super(Rand_Tree, self).__init__(input_dim, kernel, spatial_dims, max_nodes, max_depth)
+    self.subtree_divider = Random_Divide()
+
+

@@ -32,7 +32,7 @@ class Gaussian(nn.Module):
 class MLP(nn.Module):
     def __init__(self, input_dim, nb_hidden, apply_sigmoid=True):
         super(MLP, self).__init__()
-        self.fc1 = nn.Linear(input_dim, nb_hidden)
+        self.fc1 = nn.Linear(input_dim*2, nb_hidden)
         self.act1 = nn.SELU()
         self.fc2 = nn.Linear(nb_hidden, 1)
         self.apply_sigmoid = apply_sigmoid
@@ -40,9 +40,9 @@ class MLP(nn.Module):
             self.act2 = nn.Sigmoid()
 
     def forward(self, emb_in_0, emb_in_1):
-        X = torch.cat((emb_in_0, emb_in_1), dim=1)
+        X = torch.cat((emb_in_0, emb_in_1), dim=2)
         h = self.act1(self.fc1(X))
         o = self.fc2(h)
         if self.apply_sigmoid:
             o = self.act2(o)
-        return o
+        return o.squeeze(2)
