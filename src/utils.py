@@ -52,7 +52,6 @@ def read_args():
   # Training
   add_arg('--nb_epoch', help='Number of epochs to train', type=int, default=2)
   add_arg('--lrate', help='Initial learning rate', type=float, default = 0.005)
-  add_arg('--lrate_decay',help='Exponential decay factor',type=float,default=0.96)
   add_arg('--batch_size', help='Size of each minibatch', type=int, default=4)
 
   # Dataset
