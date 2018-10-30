@@ -370,11 +370,10 @@ def save_preds(evt_id, f_name, pred_y, experiment_dir):
       writer.writerow((e, f, y))
 
 def save_test_scores(nb_eval, epoch_loss, tpr, roc, experiment_dir):
-  '''
-  Save scores over the test set.
-  '''
-  pred_file = os.path.join(experiment_dir, 'test_scores.csv')
-  with open(pred_file, 'x') as csvfile:
-    writer = csv.writer(csvfile)
-    writer.writerow(['nb_samples', 'epoch_loss', 'tpr', 'roc'])
-    writer.writerow([nb_eval, epoch_loss, tpr, roc])
+  test_scores = {'nb_eval':nb_eval,
+                 'epoch_loss':epoch_loss,
+                 'tpr':float(tpr),
+                 'roc auc':float(roc)}
+  pred_file = os.path.join(experiment_dir, 'test_scores.yml')
+  with open(pred_file, 'x') as f:
+    yaml.dump(test_scores, f, default_flow_style=False)
