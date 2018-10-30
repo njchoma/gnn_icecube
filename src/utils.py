@@ -3,6 +3,7 @@ import csv
 import argparse
 import logging
 import pickle
+import yaml
 import numpy as np
 
 from sklearn.metrics import roc_auc_score, roc_curve
@@ -18,7 +19,7 @@ import model
 #####################
 #     CONSTANTS     #
 #####################
-ARGS_NAME  = 'args.pkl'
+ARGS_NAME  = 'args.yml'
 MODEL_NAME = 'model.pkl'
 BEST_MODEL = 'best_model.pkl'
 STATS_CSV  = 'training_stats.csv'
@@ -273,8 +274,8 @@ def load_args(experiment_dir):
   args contain e.g. nb_epochs_complete, lrate
   '''
   args_path = os.path.join(experiment_dir, ARGS_NAME)
-  with open(args_path, 'rb') as argfile:
-    args = pickle.load(argfile)
+  with open(args_path, 'r') as argfile:
+    args = yaml.load(argfile)
   logging.warning("Model arguments restored.")
   return args
 
@@ -284,8 +285,8 @@ def save_args(experiment_dir, args):
   args contain e.g. nb_epochs_complete, lrate
   '''
   args_path = os.path.join(experiment_dir, ARGS_NAME)
-  with open(args_path, 'wb') as argfile:
-    pickle.dump(args, argfile)
+  with open(args_path, 'w') as argfile:
+    yaml.dump(args, argfile, default_flow_style=False)
   logging.warning("Experiment arguments saved")
 
 ######################
