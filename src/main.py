@@ -96,7 +96,7 @@ def train(
     # Track best model performance
     if (val_stats[0] > args.best_tpr):
       logging.warning("Best performance on valid set.")
-      args.best_tpr = val_stats[0]
+      args.best_tpr = float(val_stats[0])
       utils.update_best_plots(experiment_dir)
       utils.save_best_model(experiment_dir, net)
 
