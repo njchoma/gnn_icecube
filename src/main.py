@@ -195,6 +195,7 @@ def main():
   if torch.cuda.is_available():
     net = net.cuda()
     logging.warning("Training on GPU")
+    logging.info("GPU type:\n{}".format(torch.cuda.get_device_name(0)))
   criterion = nn.functional.binary_cross_entropy
   if not args.evaluate:
     assert (args.train_file != None)
