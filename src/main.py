@@ -167,7 +167,7 @@ def main():
   args = utils.read_args()
 
   # Get path to experiment directory
-  experiment_dir = utils.get_experiment_dir(args.name)
+  experiment_dir = utils.get_experiment_dir(args.name, args.run)
   # Create experiment directory and csv file if not found
   utils.initialize_experiment_if_needed(experiment_dir, args.evaluate)
   # Logger will print to stdout and logfile

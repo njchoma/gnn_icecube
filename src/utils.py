@@ -42,6 +42,7 @@ def read_args():
 
   # Experiment
   add_arg('--name', help='Experiment reference name', required=True)
+  add_arg('--run', help='Experiment run number', default=0)
   add_arg('--eval_tpr',help='FPR at which TPR will be evaluated', default=0.000003)
   add_arg('--evaluate', help='Perform evaluation on test set only',action='store_true')
   add_arg('--save_best', help='Save best model', action='store_true')
@@ -76,7 +77,7 @@ def initialize_logger(experiment_dir):
   logging.basicConfig(filename=logfile,format='%(message)s',level=logging.INFO)
   logging.getLogger().addHandler(logging.StreamHandler())
 
-def get_experiment_dir(experiment_name):
+def get_experiment_dir(experiment_name, run_number):
   '''
   Saves all models within a 'models' directory where the experiment is run.
   Returns path to the specific experiment within the 'models' directory.
@@ -85,7 +86,7 @@ def get_experiment_dir(experiment_name):
   save_dir = os.path.join(current_dir, 'models')
   if not os.path.exists(save_dir):
     os.mkdir(save_dir) # Create models dir which will contain experiment data
-  return os.path.join(save_dir, experiment_name)
+  return os.path.join(save_dir, experiment_name, str(run_number))
 
 def initialize_experiment_if_needed(model_dir, evaluate_only):
   '''
@@ -102,7 +103,7 @@ def initialize_experiment(experiment_dir):
   Create experiment directory and initiate csv where epoch info will be stored.
   '''
   print("Initializing experiment.")
-  os.mkdir(experiment_dir)
+  os.makedirs(experiment_dir)
   csv_path = os.path.join(experiment_dir, STATS_CSV)
   with open(csv_path, 'w') as csvfile:
     writer = csv.writer(csvfile)
