@@ -46,8 +46,6 @@ def read_args():
   add_arg('--run', help='Experiment run number', default=0)
   add_arg('--eval_tpr',help='FPR at which TPR will be evaluated', default=0.000003)
   add_arg('--evaluate', help='Perform evaluation on test set only',action='store_true')
-  add_arg('--save_best', help='Save best model', action='store_true')
-  add_arg('--save_every_epoch', help='Save model after every epoch. Good if training expected to be interrupted', action='store_true')
 
   # Training
   add_arg('--nb_epoch', help='Number of epochs to train', type=int, default=2)
