@@ -23,10 +23,7 @@ ARGS_NAME  = 'args.yml'
 MODEL_NAME = 'model.pkl'
 BEST_MODEL = 'best_model.pkl'
 STATS_CSV  = 'training_stats.csv'
-NB_ZERO_NODES = 0 # Drastically improves performance
 CURRENT_BASELINE = [3*10**-6, 0.05]
-NB_N_FILES=17101
-NB_C_FILES=73665
 
 #####################################
 #     EXPERIMENT INITIALIZATION     #
@@ -169,7 +166,6 @@ def save_epoch_model(experiment_dir, net):
   '''
   model_path = os.path.join(experiment_dir, MODEL_NAME)
   save_model(net, model_path)
-  logging.warning("Current model saved.")
 
 
 def load_args(experiment_dir):
@@ -191,7 +187,6 @@ def save_args(experiment_dir, args):
   args_path = os.path.join(experiment_dir, ARGS_NAME)
   with open(args_path, 'w') as argfile:
     yaml.dump(args, argfile, default_flow_style=False)
-  logging.warning("Experiment arguments saved")
 
 ######################
 #     EVALUATION     #
@@ -207,11 +202,13 @@ def score_plot_preds(true_y, pred_y, weights, experiment_dir, plot_name, f=0.5):
   tpr = 0.0
   for i, fpr in enumerate(fprs):
     if fpr > f:
+      '''
       try:
         logging.warning("FPR: {}, TPR: {}, Threshold: {}".format(
                           f, tpr, thresholds[i-1]))
       except:
         pass
+      '''
       break
     tpr = tprs[i]
 

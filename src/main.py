@@ -56,6 +56,8 @@ def train_one_epoch(net,
   tpr, roc = utils.score_plot_preds(true_y, pred_y, weights,
                                       experiment_dir, 'train', args.eval_tpr)
   epoch_loss /= nb_train
+  logging.info("Train: loss {:>.3E} -- AUC {:>.3E} -- TPR {:>.3e}".format(
+                                                      epoch_loss, roc, tpr))
   return (tpr, roc, epoch_loss)
 
 
