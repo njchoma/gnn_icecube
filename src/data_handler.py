@@ -63,7 +63,7 @@ class IceCube_Dataset(Dataset):
         self.f = filenames[:nb_samples]
 
     def __getitem__(self, index):
-        X_i = self.X[index]
+        X_i = self.X[index][:,:6] # leave out nstring
         y_i = self.y[index]
         w_i = self.w[index]
         e_i = self.e[index]

@@ -10,6 +10,7 @@ from sklearn.metrics import roc_auc_score
 
 import utils
 import model
+from data_handler import construct_loader
 
 #####################
 #     CONSTANTS     #
@@ -20,28 +21,21 @@ TEST_NAME='Test'
 #     EXPERIMENT      #
 #######################
 
-def train_one_epoch(net, criterion, optimizer, args, experiment_dir,
-                    train_X,
-                    train_y,
-                    train_w):
-  '''
-  Train network for one epoch over the training set
-  '''
+def train_one_epoch(net,
+                    criterion,
+                    optimizer,
+                    args,
+                    experiment_dir,
+                    train_loader):
   net.train()
-  nb_train = len(train_X)
-  batches = utils.get_batches(nb_train, args.batch_size)
-  nb_batches = len(batches)
+  nb_train = len(train_loader) * args.batch_size
   epoch_loss = 0
   pred_y = np.zeros((nb_train))
   true_y = np.zeros((nb_train))
   weights = np.zeros((nb_train))
-  for i, batch in enumerate(batches):
+  for i, batch in enumerate(train_loader):
+    X, y, w, adj_mask, batch_nb_nodes, _, _ = batch
     optimizer.zero_grad()
-    X, y, w, adj_mask, batch_nb_nodes = utils.batch_sample(
-                                              train_X[batch],
-                                              train_y[batch],
-                                              train_w[batch]
-                                              )
     out = net(X, adj_mask, batch_nb_nodes)
     loss = criterion(out, y, w)
     loss.backward()
@@ -50,18 +44,18 @@ def train_one_epoch(net, criterion, optimizer, args, experiment_dir,
     beg =     i * args.batch_size
     end = (i+1) * args.batch_size
     pred_y[beg:end]  = out.data.cpu().numpy()
-    true_y[beg:end]  = train_y[batch]
-    weights[beg:end] = train_w[batch]
+    true_y[beg:end]  = y.data.cpu().numpy()
+    weights[beg:end] = w.data.cpu().numpy()
 
     epoch_loss += loss.item() 
     # Print running loss about 10 times during each epoch
-    if (((i+1) % (nb_batches//10)) == 0):
+    if (((i+1) % (len(train_loader)//10)) == 0):
       nb_proc = (i+1)*args.batch_size
       logging.info("  {:5d}: {:.9f}".format(nb_proc, epoch_loss/nb_proc))
 
   tpr, roc = utils.score_plot_preds(true_y, pred_y, weights,
                                       experiment_dir, 'train', args.eval_tpr)
-  epoch_loss /= nb_batches * args.batch_size
+  epoch_loss /= nb_train
   return (tpr, roc, epoch_loss)
 
 
@@ -70,8 +64,8 @@ def train(
           criterion,
           args, 
           experiment_dir, 
-          train_X, train_y, train_w, 
-          val_X, val_y, val_w
+          train_loader, 
+          valid_loader
           ):
   optimizer = torch.optim.Adamax(net.parameters(), lr=args.lrate)
   scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max')
@@ -87,9 +81,9 @@ def train(
                                   optimizer,
                                   args,
                                   experiment_dir,
-                                  train_X, train_y, train_w)
+                                  train_loader)
     val_stats = evaluate(net, criterion, experiment_dir, args,
-                            val_X,val_y,val_w, 'Valid')
+                            valid_loader, 'Valid')
                                 
     utils.track_epoch_stats(i, args.lrate, 0, train_stats, val_stats, experiment_dir)
 
@@ -120,16 +114,12 @@ def evaluate(net,
              criterion,
              experiment_dir,
              args,
-             in_X, in_y, in_w,
-             plot_name,
-             in_e=None,
-             in_f=None):
+             valid_loader,
+             plot_name):
+             
     net.eval()
     epoch_loss = 0
-    # Get minibatches
-    nb_samples = len(in_X)
-    batches = utils.get_batches(nb_samples, args.batch_size)
-    nb_batches = len(batches)
+    nb_batches = len(valid_loader)
     nb_eval = nb_batches * args.batch_size
     # Track samples by batches for scoring
     pred_y = np.zeros((nb_eval))
@@ -137,17 +127,10 @@ def evaluate(net,
     weights = np.zeros((nb_eval))
     evt_id = []
     f_name = []
-    # Get predictions and loss over batches
     logging.info("Evaluating {} {} samples.".format(nb_eval,plot_name))
     with torch.autograd.no_grad():
-        for i, batch in enumerate(batches):
-            # Wrap samples in torch Variables
-            X, y, w, adj_mask, batch_nb_nodes = utils.batch_sample(
-                                                      in_X[batch],
-                                                      in_y[batch],
-                                                      in_w[batch]
-                                                      )
-            # Make predictions over batch
+        for i, batch in enumerate(valid_loader):
+            X, y, w, adj_mask, batch_nb_nodes, evt_ids, evt_names = batch
             out = net(X, adj_mask, batch_nb_nodes)
             loss = criterion(out, y, w)
             epoch_loss += loss.item() 
@@ -155,11 +138,12 @@ def evaluate(net,
             beg =     i * args.batch_size
             end = (i+1) * args.batch_size
             pred_y[beg:end] = out.data.cpu().numpy()
-            true_y[beg:end] = in_y[batch]
-            weights[beg:end] = in_w[batch]
-            if in_e is not None:
-                evt_id.extend(in_e[batch])
-                f_name.extend(in_f[batch])
+            true_y[beg:end] = y.data.cpu().numpy()
+            weights[beg:end] = w.data.cpu().numpy()
+            if plot_name==TEST_NAME:
+                evt_id.extend(evt_ids)
+                f_name.extend(evt_names)
+
             # Print running loss 2 times 
             if (((i+1) % (nb_batches//2)) == 0):
                 nb_proc = (i+1)*args.batch_size
@@ -172,16 +156,15 @@ def evaluate(net,
                                       experiment_dir, plot_name, args.eval_tpr)
     logging.info("{}: loss {:>.3E} -- AUC {:>.3E} -- TPR {:>.3e}".format(
                                       plot_name, epoch_loss, roc, tpr))
-    if in_e is not None:
-        utils.save_preds(evt_id, f_name, pred_y, experiment_dir)
-    # Save test numbers if evaluating on test set
+
     if plot_name == TEST_NAME:
         utils.save_test_scores(nb_eval, epoch_loss, tpr, roc, experiment_dir)
+        utils.save_preds(evt_id, f_name, pred_y, experiment_dir)
     return (tpr, roc, epoch_loss)
 
 
 def main():
-  input_dim=7
+  input_dim=6
   spatial_dims=[0,1,2]
   args = utils.read_args()
 
@@ -214,17 +197,25 @@ def main():
   if not args.evaluate:
     assert (args.train_file != None)
     assert (args.val_file   != None)
-    train_X,train_y,train_w,_,_=utils.load_dataset(args.train_file,args.nb_train)
-    val_X,  val_y,  val_w, _,_ =utils.load_dataset(args.val_file,  args.nb_val)
-    logging.info("Training on {} samples.".format(len(train_X)))
-    logging.info("Validate on {} samples.".format(len(val_X)))
+    train_loader = construct_loader(
+                                args.train_file,
+                                args.nb_train,
+                                args.batch_size,
+                                shuffle=True)
+    valid_loader = construct_loader(args.val_file,
+                                    args.nb_val,
+                                    args.batch_size)
+    logging.info("Training on {} samples.".format(
+                                          len(train_loader)*args.batch_size))
+    logging.info("Validate on {} samples.".format(
+                                          len(valid_loader)*args.batch_size))
     train(
           net,
           criterion,
           args,
           experiment_dir,
-          train_X, train_y, train_w,
-          val_X, val_y, val_w
+          train_loader,
+          valid_loader
           )
 
   # Perform evaluation over test set
@@ -234,9 +225,15 @@ def main():
   except:
     logging.warning("\nCould not load best model for test set. Using current.")
   assert (args.test_file != None)
-  test_X, test_y, test_w, test_e, test_f= utils.load_dataset(args.test_file,args.nb_test)
-  test_stats = evaluate(net, criterion, experiment_dir, args,
-                            test_X, test_y, test_w, TEST_NAME, test_e, test_f)
+  test_loader = construct_loader(args.test_file,
+                                 args.nb_test,
+                                 args.batch_size)
+  test_stats = evaluate(net,
+                        criterion,
+                        experiment_dir,
+                        args,
+                        test_loader,
+                        TEST_NAME)
 
 if __name__ == "__main__":
   main()
