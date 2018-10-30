@@ -20,7 +20,10 @@ TEST_NAME='Test'
 #     EXPERIMENT      #
 #######################
 
-def train_one_epoch(net, criterion, optimizer, args, train_X, train_y, train_w):
+def train_one_epoch(net, criterion, optimizer, args, experiment_dir,
+                    train_X,
+                    train_y,
+                    train_w):
   '''
   Train network for one epoch over the training set
   '''
@@ -29,6 +32,9 @@ def train_one_epoch(net, criterion, optimizer, args, train_X, train_y, train_w):
   batches = utils.get_batches(nb_train, args.batch_size)
   nb_batches = len(batches)
   epoch_loss = 0
+  pred_y = np.zeros((nb_train))
+  true_y = np.zeros((nb_train))
+  weights = np.zeros((nb_train))
   for i, batch in enumerate(batches):
     optimizer.zero_grad()
     X, y, w, adj_mask, batch_nb_nodes = utils.batch_sample(
@@ -40,13 +46,23 @@ def train_one_epoch(net, criterion, optimizer, args, train_X, train_y, train_w):
     loss = criterion(out, y, w)
     loss.backward()
     optimizer.step()
+
+    beg =     i * args.batch_size
+    end = (i+1) * args.batch_size
+    pred_y[beg:end]  = out.data.cpu().numpy()
+    true_y[beg:end]  = train_y[batch]
+    weights[beg:end] = train_w[batch]
+
     epoch_loss += loss.item() 
     # Print running loss about 10 times during each epoch
     if (((i+1) % (nb_batches//10)) == 0):
       nb_proc = (i+1)*args.batch_size
       logging.info("  {:5d}: {:.9f}".format(nb_proc, epoch_loss/nb_proc))
-    
-  return epoch_loss / (nb_batches * args.batch_size)
+
+  tpr, roc = utils.score_plot_preds(true_y, pred_y, weights,
+                                      experiment_dir, 'train', args.eval_tpr)
+  epoch_loss /= nb_batches * args.batch_size
+  return (tpr, roc, epoch_loss)
 
 
 def train(
@@ -57,48 +73,35 @@ def train(
           train_X, train_y, train_w, 
           val_X, val_y, val_w
           ):
-  '''
-  Train network over all epochs.
-  Optionally save model after every epoch.
-  Optionally track best model.
-  '''
+  optimizer = torch.optim.Adamax(net.parameters(), lr=args.lrate)
+  scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max')
   # Nb epochs completed tracked in case training interrupted
   for i in range(args.nb_epochs_complete, args.nb_epoch):
     # Update learning rate in optimizer
-    optimizer = torch.optim.Adamax(net.parameters(), lr=args.lrate)
     t0 = time.time()
     logging.info("\nEpoch {}".format(i+1))
     logging.info("Learning rate: {0:.3g}".format(args.lrate))
     # Train for one epoch
-    train_loss = train_one_epoch(net, criterion, optimizer, args, 
+    train_stats = train_one_epoch(net, criterion, optimizer, args, experiment_dir,
                                  train_X, train_y, train_w)
     # Evaluate over train, validation set
-    train_stats = evaluate(net, criterion, experiment_dir, args,
-                                train_X[:args.nb_val],
-                                train_y[:args.nb_val],
-                                train_w[:args.nb_val],
-                                'Train'
-                                )
     val_stats = evaluate(net, criterion, experiment_dir, args,
                             val_X,val_y,val_w, 'Valid')
                                 
-    # Log epoch stats in CSV file
-    utils.track_epoch_stats(i, args.lrate, train_loss, train_stats, val_stats, experiment_dir)
+    utils.track_epoch_stats(i, args.lrate, 0, train_stats, val_stats, experiment_dir)
     # Update learning rate, remaining nb epochs to train
-    args.lrate *= args.lrate_decay
+    scheduler.step(val_stats[0])
+    args.lrate = optimizer.param_groups[0]['lr']
     args.nb_epochs_complete += 1
     # Track best model performance
     if (val_stats[0] > args.best_tpr):
       logging.warning("Best performance on valid set.")
       args.best_tpr = val_stats[0]
       utils.update_best_plots(experiment_dir)
-      # Save best model
-      if (args.save_best):
-        utils.save_best_model(experiment_dir, net)
-    # Optionally save model after each epoch
-    if (args.save_every_epoch):
-      utils.save_epoch_model(experiment_dir, net)
-      utils.save_args(experiment_dir, args)
+      utils.save_best_model(experiment_dir, net)
+
+    utils.save_epoch_model(experiment_dir, net)
+    utils.save_args(experiment_dir, args)
     logging.info("Epoch took {} seconds.".format(int(time.time()-t0)))
 
   logging.warning("Training completed.")
