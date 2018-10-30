@@ -135,7 +135,7 @@ def evaluate(net,
     f_name = []
     # Get predictions and loss over batches
     logging.info("Evaluating {} {} samples.".format(nb_eval,plot_name))
-    with torch.autograd.no_grad()
+    with torch.autograd.no_grad():
         for i, batch in enumerate(batches):
             # Wrap samples in torch Variables
             X, y, w, adj_mask, batch_nb_nodes = utils.batch_sample(
