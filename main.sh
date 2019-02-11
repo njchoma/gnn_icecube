@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=GCNN
+#SBATCH --job-name=IceCube_GNN
 #SBATCH --output=slurm_out/GCNN_%A_%a.out
 #SBATCH --time=2-00:00:00
 #SBATCH --gres gpu:1

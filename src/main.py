@@ -105,7 +105,7 @@ def train(
     utils.save_args(experiment_dir, args)
     logging.info("Epoch took {} seconds.".format(int(time.time()-t0)))
     
-    if args.lrate < 10**-7:
+    if args.lrate < 10**-6:
         logging.warning("Minimum learning rate reched.")
         break
 

@@ -23,7 +23,7 @@ ARGS_NAME  = 'args.yml'
 MODEL_NAME = 'model.pkl'
 BEST_MODEL = 'best_model.pkl'
 STATS_CSV  = 'training_stats.csv'
-CURRENT_BASELINE = [3*10**-6, 0.05]
+CURRENT_BASELINE = [1.44576*10**-6, 0.04302]
 
 #####################################
 #     EXPERIMENT INITIALIZATION     #
